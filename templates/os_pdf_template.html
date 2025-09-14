@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Ordem de Serviço #{{ os.id }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            color: #333;
+            font-size: 10pt; /* <-- TAMANHO PADRÃO DEFINIDO COMO 10PT */
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #005f73;
+            position: relative;
+        }
+
+        .os-number-box {
+            position: absolute;
+            top: 0;
+            right: 0;
+            border: 1px solid #ccc;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 10pt;
+        }
+        .os-number-box strong {
+            display: block;
+            font-size: 7pt;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .header img {
+            max-height: 70px;
+            width: auto;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            font-size: 12pt; /* Título da seção mantido maior */
+            color: #005f73;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .info-grid {
+            display: grid;
+            /* Agora com 3 colunas para acomodar as datas */
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 5px 20px;
+            font-size: 10pt;
+        }
+        .info-item {
+            padding: 4px 0;
+        }
+        .info-item strong {
+            display: block;
+            font-size: 8pt; /* Rótulos mantidos menores para destaque */
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        .problem-box {
+            background-color: #f8f9fa;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 10pt; /* <-- ALTERADO PARA 10PT */
+        }
+        .problem-box p {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: none;
+            border-bottom: 1px solid #ddd;
+            padding: 8px; /* Aumentei um pouco o padding para 10pt */
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            font-size: 10pt; /* <-- ALTERADO PARA 10PT */
+        }
+        td {
+            font-size: 10pt; /* <-- ALTERADO PARA 10PT */
+        }
+        .summary-row td {
+            border-top: 1px solid #ccc;
+            font-weight: bold;
+        }
+        .grand-total-row td {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            font-size: 12pt; /* Total mantido maior para destaque */
+            border-top: 2px solid #333;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 8pt;
+            color: #777;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        {% if logo_path %}
+            <img src="{{ logo_path }}">
+        {% else %}
+            <h1>Ordem de Serviço</h1>
+        {% endif %}
+
+        <div class="os-number-box">
+            <strong>O.S.</strong>
+            {{ os.id }}
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="info-grid">
+            <div class="info-item" style="grid-column: span 3;">
+                <strong>CLIENTE</strong>
+                {{ os.cliente.nome_exibicao }}
+            </div>
+
+            <div class="info-grid">
+                <div class="info-item" style="grid-column: span 3;">
+                    <strong>CLIENTE</strong>
+                    {% if os.cliente %}
+                        {{ os.cliente.nome_exibicao }}
+                    {% else %}
+                        CLIENTE NÃO ENCONTRADO
+                    {% endif %}
+                </div>
+
+                <div class="info-item" style="grid-column: span 3;">
+                    <strong>ENDEREÇO</strong>
+                    {% if os.cliente and os.cliente.rua %}
+                        {{ os.cliente.rua }}, {{ os.cliente.numero }} - {{ os.cliente.bairro }}, {{ os.cliente.cidade }} - {{ os.cliente.uf }}
+                    {% endif %}
+                </div>
+                
+                <div class="info-item">
+                    <strong>Nº DA O.S.</strong>
+                    {{ os.id }}
+                </div>
+                <div class="info-item">
+                    <strong>DATA DE ABERTURA</strong>
+                    {{ os.data_criacao.strftime('%d/%m/%Y') }}
+                </div>
+                
+                {% if os.data_fechamento %}
+                <div class="info-item">
+                    <strong>DATA DE FECHAMENTO</strong>
+                    {{ os.data_fechamento.strftime('%d/%m/%Y') }}
+                </div>
+                {% endif %}
+                
+                <div class="info-item">
+                    <strong>CONTATO</strong>
+                    {% if os.cliente %}
+                        {{ os.cliente.telefone_formatado }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Descrição do Problema / Serviço Realizado</h2>
+        <div class="problem-box">
+            <p>{{ os.problema }}</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Detalhamento Financeiro</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Descrição</th>
+                    <th class="text-center">Qtd.</th>
+                    <th class="text-right">Valor Unit.</th>
+                    <th class="text-right">Valor Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if os.pecas %}
+                    {% for peca in os.pecas %}
+                    <tr>
+                        <td>{{ peca.descricao }}</td>
+                        <td class="text-center">{{ peca.quantidade }}</td>
+                        <td class="text-right">R$ {{ "%.2f"|format(peca.valor_unitario) }}</td>
+                        <td class="text-right">R$ {{ "%.2f"|format(peca.valor_total) }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="summary-row">
+                        <td colspan="3">SUBTOTAL PEÇAS</td>
+                        <td class="text-right">R$ {{ "%.2f"|format(os.valor_pecas) }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td colspan="3">VALOR DOS SERVIÇOS</td>
+                    <td class="text-right">R$ {{ "%.2f"|format(os.valor_servicos) }}</td>
+                </tr>
+                <tr class="grand-total-row">
+                    <td colspan="3">VALOR TOTAL</td>
+                    <td class="text-right">R$ {{ "%.2f"|format(os.valor_total) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>Agradecemos a preferência!</p>
+        <p>Digootech Informática - (43) 3339-6161</p>
+    </div>
+
+</body>
+</html>

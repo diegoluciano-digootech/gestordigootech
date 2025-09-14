@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="h3 mb-3">Relatório de Faturamento</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        Filtrar por Período
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('relatorio_faturamento') }}">
+            <div class="row align-items-end g-3">
+                <div class="col-md-4">
+                    <label for="data_inicio" class="form-label">Data de Início (Emissão)</label>
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ data_inicio or '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="data_fim" class="form-label">Data Final (Emissão)</label>
+                    <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ data_fim or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="cliente_id" class="form-label">Cliente</label>
+                    <select id="cliente_id" name="cliente_id" class="form-select">
+                        <option value="todos">Todos</option>
+                        {% for cliente in todos_clientes %}
+                            <option value="{{ cliente.id }}" {% if cliente_id_filtro == cliente.id|string %}selected{% endif %}>
+                                {{ cliente.nome_exibicao }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        Resultados para o Período Selecionado
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card text-center bg-success bg-opacity-10">
+                    <div class="card-body"><h5 class="card-title text-muted">Faturamento Total</h5><p class="card-text h2 text-success">R$ {{ "%.2f"|format(faturamento_total) }}</p></div>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card text-center"><div class="card-body"><h5 class="card-title text-muted">Total em Serviços</h5><p class="card-text h3">R$ {{ "%.2f"|format(total_servicos) }}</p></div></div>
+            </div>
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card text-center"><div class="card-body"><h5 class="card-title text-muted">Total em Peças</h5><p class="card-text h3">R$ {{ "%.2f"|format(total_pecas) }}</p></div></div>
+            </div>
+            <div class="col-lg-6 col-md-6 mb-4">
+                <div class="card text-center"><div class="card-body"><h5 class="card-title text-muted">Nº de O.S. Finalizadas</h5><p class="card-text h3">{{ num_os_finalizadas }}</p></div></div>
+            </div>
+            <div class="col-lg-6 col-md-12 mb-4">
+                <div class="card text-center"><div class="card-body"><h5 class="card-title text-muted">Ticket Médio</h5><p class="card-text h3">R$ {{ "%.2f"|format(ticket_medio) }}</p></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0">Faturas Geradas</h2>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">Fatura ID</th>
+                    <th scope="col">Cliente</th>
+                    <th scope="col">Data de Emissão</th>
+                    <th scope="col">Valor Total</th>
+                    <th scope="col" class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fatura in faturas %}
+                <tr>
+                    <th scope="row">#{{ fatura.id }}</th>
+                    <td>{{ fatura.cliente.nome_exibicao }}</td>
+                    <td>{{ fatura.data_emissao.strftime('%d/%m/%Y') }}</td>
+                    <td>R$ {{ "%.2f"|format(fatura.valor_total_faturado) }}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('gerar_fatura_pdf', fatura_id=fatura.id) }}" class="btn btn-info btn-sm" target="_blank">Imprimir PDF</a>
+                        <form action="{{ url_for('cancelar_fatura', fatura_id=fatura.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja cancelar esta fatura? As O.S. voltarão para a tela de faturamento.');">
+                            <button type="submit" class="btn btn-danger btn-sm">Cancelar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">Nenhuma fatura encontrada com os filtros selecionados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        $('#cliente_id').select2({
+            theme: "bootstrap-5"
+        });
+    });
+</script>
+{% endblock %}

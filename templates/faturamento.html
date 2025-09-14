@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="h3 mb-3">Faturamento de Ordens de Serviço</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">Filtros</div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('faturamento') }}">
+            <div class="row align-items-end g-3">
+                <div class="col-md-4"><label for="data_inicio" class="form-label">Data de Início (Finalização)</label><input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ data_inicio or '' }}"></div>
+                <div class="col-md-4"><label for="data_fim" class="form-label">Data Final (Finalização)</label><input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ data_fim or '' }}"></div>
+                <div class="col-md-3"><label for="cliente_id" class="form-label">Cliente</label><select id="cliente_id" name="cliente_id" class="form-select"><option value="todos">Todos</option>{% for cliente in todos_clientes %}<option value="{{ cliente.id }}" {% if cliente_id_filtro == cliente.id|string %}selected{% endif %}>{{ cliente.nome_exibicao }}</option>{% endfor %}</select></div>
+                <div class="col-md-1"><button type="submit" class="btn btn-primary w-100">Filtrar</button></div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="formFaturamento" action="{{ url_for('faturamento') }}" method="POST">
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Ordens de Serviço Finalizadas (Aguardando Faturamento)</span>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#faturamentoModal" id="btnAbrirModalFaturamento" disabled>Faturar Selecionadas</button>
+        </div>
+        <div class="card-body">
+            <div class="mb-3 text-end">
+                <h5 class="mb-0">Total Selecionado: <span id="totalSelecionado" class="badge bg-primary fs-6">R$ 0,00</span></h5>
+            </div>
+            <table class="table table-hover">
+                <thead><tr><th scope="col" style="width: 1%;"><input class="form-check-input" type="checkbox" id="selectAll"></th><th scope="col">ID</th><th scope="col">Cliente</th><th scope="col">Data Finalização</th><th class="text-end" scope="col">Valor Total</th></tr></thead>
+                <tbody>
+                    {% for ordem in ordens %}
+                    <tr>
+                        <td><input class="form-check-input os-checkbox" type="checkbox" name="os_ids" value="{{ ordem.id }}" data-cliente-id="{{ ordem.cliente.id }}" data-valor="{{ ordem.valor_total }}"></td>
+                        <td><a href="{{ url_for('detalhe_os', id=ordem.id) }}">{{ ordem.id }}</a></td>
+                        <td>{{ ordem.cliente.nome_exibicao }}</td>
+                        <td>{{ ordem.data_fechamento.strftime('%d/%m/%Y') }}</td>
+                        <td class="text-end">R$ {{ "%.2f"|format(ordem.valor_total) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center">Nenhuma Ordem de Serviço finalizada encontrada com os filtros selecionados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="faturamentoModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Dados do Faturamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                        <h6 class="mb-0">Valor Total: <span id="modalTotalFatura">R$ 0,00</span></h6>
+                        <h6 class="mb-0">Valor Restante: <span id="modalTotalRestante" class="text-danger">R$ 0,00</span></h6>
+                    </div>
+                    <div class="row align-items-end mb-3 p-3 border rounded">
+                         <div class="col-md-5">
+                            <label for="tipo_pagamento_base" class="form-label">Forma de Pagamento</label>
+                            <select class="form-select" id="tipo_pagamento_base">
+                                <option value="PIX">PIX</option><option value="Cartão">Cartão</option><option value="Boleto">Boleto</option><option value="Acerto">Acerto</option><option value="À Vista">À Vista</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="num_parcelas_base" class="form-label">Nº de Parcelas</label>
+                            <input type="number" class="form-control" id="num_parcelas_base" value="1" min="1">
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" id="btnGerarParcelas" class="btn btn-secondary w-100">Gerar/Adicionar Pagamentos</button>
+                        </div>
+                    </div>
+                    <div id="listaPagamentosContainer" class="mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <small id="validationMessage" class="text-danger me-auto"></small>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" id="btnConfirmarFatura" class="btn btn-primary">Confirmar e Gerar Fatura</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<template id="templatePagamento">
+    <div class="pagamento-item border rounded p-3 mb-2">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Forma de Pagamento</label>
+                <input type="text" class="form-control-plaintext" name="pagamento_tipo[]" readonly>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Vencimento</label>
+                <input type="date" class="form-control" name="pagamento_vencimento[]" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Valor</label>
+                <div class="input-group"><span class="input-group-text">R$</span><input type="number" step="0.01" class="form-control valor-pagamento" name="pagamento_valor[]" required></div>
+            </div>
+            <div class="col-md-2 campos-adicionais-container"></div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="button" class="btn btn-danger w-100 btn-remover-pagamento">X</button>
+            </div>
+        </div>
+        <div class="hidden-inputs"></div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('#cliente_id').select2({ theme: "bootstrap-5" });
+    const btnFaturar = $('#btnAbrirModalFaturamento');
+    const checkboxes = $('.os-checkbox');
+    const selectAll = $('#selectAll');
+    let totalFatura = 0;
+
+    function verificarSelecao() {
+        totalFatura = 0;
+        const selecionados = checkboxes.filter(':checked');
+        selecionados.each(function() { totalFatura += parseFloat($(this).data('valor')); });
+        $('#totalSelecionado').text('R$ ' + totalFatura.toFixed(2).replace('.', ','));
+        if (selecionados.length === 0) { btnFaturar.prop('disabled', true); return; }
+        const primeiroClienteId = selecionados.first().data('cliente-id');
+        let todosDoMesmoCliente = true;
+        selecionados.each(function() { if ($(this).data('cliente-id') !== primeiroClienteId) { todosDoMesmoCliente = false; } });
+        btnFaturar.prop('disabled', !todosDoMesmoCliente);
+        if (!todosDoMesmoCliente) { alert('Atenção: Para faturar em grupo, todas as Ordens de Serviço devem pertencer ao mesmo cliente.'); }
+    }
+    checkboxes.on('change', verificarSelecao);
+    selectAll.on('change', function() { checkboxes.prop('checked', this.checked); verificarSelecao(); });
+
+    const pagamentosContainer = $('#listaPagamentosContainer');
+    const btnConfirmar = $('#btnConfirmarFatura');
+    const validationMessage = $('#validationMessage');
+
+    function calcularRestante() {
+        let totalPago = 0;
+        $('.valor-pagamento').each(function() { totalPago += parseFloat($(this).val()) || 0; });
+        const restante = totalFatura - totalPago;
+        $('#modalTotalRestante').text('R$ ' + restante.toFixed(2).replace('.', ',')).toggleClass('text-danger', restante !== 0).toggleClass('text-success', restante === 0);
+        if (Math.abs(restante) > 0.01) {
+            btnConfirmar.prop('disabled', true);
+            validationMessage.text('A soma dos pagamentos não bate com o valor total.');
+        } else {
+            btnConfirmar.prop('disabled', false);
+            validationMessage.text('');
+        }
+    }
+
+    $('#btnGerarParcelas').on('click', function() {
+        const numParcelas = parseInt($('#num_parcelas_base').val());
+        const tipoBase = $('#tipo_pagamento_base').val();
+        let totalJaAdicionado = 0;
+        $('.valor-pagamento').each(function() { totalJaAdicionado += parseFloat($(this).val()) || 0; });
+        const valorParaParcelar = totalFatura - totalJaAdicionado;
+
+        if (numParcelas > 0 && valorParaParcelar > 0.009) {
+            const valorBase = Math.floor((valorParaParcelar / numParcelas) * 100) / 100;
+            let valorRestante = valorParaParcelar - (valorBase * numParcelas);
+            for (let i = 1; i <= numParcelas; i++) {
+                let valorParcela = (i === 1) ? (valorBase + valorRestante) : valorBase;
+                let dataVenc = new Date();
+                if (tipoBase == 'Acerto' || tipoBase == 'Boleto') { dataVenc.setMonth(dataVenc.getMonth() + i); }
+                let dataFormatada = dataVenc.toISOString().split('T')[0];
+                const template = $('#templatePagamento').html();
+                const novoPagamento = $(template);
+                novoPagamento.find('input[name="pagamento_tipo[]"]').val(tipoBase);
+                novoPagamento.find('input[name="pagamento_vencimento[]"]').val(dataFormatada);
+                novoPagamento.find('input[name="pagamento_valor[]"]').val(valorParcela.toFixed(2));
+                const camposAdicionais = novoPagamento.find('.campos-adicionais-container');
+                const hiddenInputs = novoPagamento.find('.hidden-inputs');
+                if (tipoBase === 'Boleto' || tipoBase === 'Acerto' || tipoBase === 'Cartão') {
+                    camposAdicionais.html(`<label class="form-label">Parcela</label><input type="text" class="form-control-plaintext" value="${i} de ${numParcelas}" readonly>`);
+                    hiddenInputs.html(`<input type="hidden" name="pagamento_chave_pix[]" value=""><input type="hidden" name="pagamento_num_parcelas[]" value="${i}">`);
+                } else if (tipoBase === 'PIX') {
+                    camposAdicionais.html(`<label class="form-label">Chave PIX</label><input type="text" class="form-control" name="pagamento_chave_pix[]" required>`);
+                    hiddenInputs.html(`<input type="hidden" name="pagamento_num_parcelas[]" value="1">`);
+                } else {
+                    hiddenInputs.html(`<input type="hidden" name="pagamento_chave_pix[]" value=""><input type="hidden" name="pagamento_num_parcelas[]" value="1">`);
+                }
+                pagamentosContainer.append(novoPagamento);
+            }
+            calcularRestante();
+        }
+    });
+
+    pagamentosContainer.on('click', '.btn-remover-pagamento', function() { $(this).closest('.pagamento-item').remove(); calcularRestante(); });
+    pagamentosContainer.on('input', '.valor-pagamento', calcularRestante);
+
+    $('#faturamentoModal').on('show.bs.modal', function() {
+        pagamentosContainer.empty();
+        $('#num_parcelas_base').val(1);
+        $('#modalTotalFatura').text('R$ ' + totalFatura.toFixed(2).replace('.', ','));
+        // CORREÇÃO: A linha abaixo foi removida
+        // $('#btnGerarParcelas').trigger('click'); 
+        calcularRestante();
+    });
+});
+</script>
+{% endblock %}

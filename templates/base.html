@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digootech Informática - Gestor de O.S.</title>
+
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="bg-light {{ body_class or '' }}">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">Gestor Digootech</a>
+            
+            {% if current_user.is_authenticated %}
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Produtos
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('estoque') }}">Estoque</a></li>
+                            </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Movimentação</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('listar_ordens') }}">Ordens de Serviço</a></li>
+                        </ul>
+                    </li>
+                     <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Financeiro</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('faturamento') }}">Faturamento</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('gerenciar_contas_a_pagar') }}">Contas a Pagar</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('gerenciar_contas_a_receber') }}">Contas a Receber</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Relatórios</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('relatorio_os') }}">Relatório OS</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('relatorio_faturamento') }}">Relatório de Faturas</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Cadastros</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('gerenciar_clientes') }}">Clientes</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('gerenciar_fornecedores') }}">Fornecedores</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('register') }}">Cadastrar Novo Usuário</a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <span class="navbar-text me-3">Olá, {{ current_user.username }}</span>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-light">Sair</a>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+    
+    <footer class="text-center text-muted mt-5 mb-3">
+    <p>&copy; 2025 Digootech Informática</p>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+{% block scripts %}{% endblock %}
+
+{% if current_user.is_authenticated %}
+<script>
+    (function() {
+        const tempoDeInatividade = 15 * 60 * 1000; 
+        let cronometro;
+        function fazerLogout() { window.location.href = "{{ url_for('logout') }}"; }
+        function reiniciarCronometro() { clearTimeout(cronometro); cronometro = setTimeout(fazerLogout, tempoDeInatividade); }
+        window.onload = reiniciarCronometro;
+        document.onmousemove = reiniciarCronometro;
+        document.onkeypress = reiniciarCronometro;
+        document.onmousedown = reiniciarCronometro;
+        document.ontouchstart = reiniciarCronometro;
+        document.onclick = reiniciarCronometro;
+        document.onscroll = reiniciarCronometro;
+        document.onkeydown = reiniciarCronometro;
+    })();
+</script>
+{% endif %}
+</body>
+</html>

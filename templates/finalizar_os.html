@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Finalizar Ordem de Serviço #{{ os.id }}</h2>
+            </div>
+            <div class="card-body">
+                <p><strong>Cliente:</strong> {{ os.cliente.nome_exibicao }}</p>
+                <p><strong>Problema:</strong> {{ os.problema }}</p>
+                <hr>
+
+                <form action="{{ url_for('finalizar_os', id=os.id) }}" method="POST">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="checkDataRetroativa">
+                        <label class="form-check-label" for="checkDataRetroativa">
+                            Informar data e hora de fechamento manualmente?
+                        </label>
+                    </div>
+
+                    <div class="mb-3" id="campoDataFechamento" style="display: none;">
+                        <label for="data_fechamento" class="form-label">Data e Hora do Fechamento</label>
+                        <input type="datetime-local" class="form-control" id="data_fechamento" name="data_fechamento">
+                    </div>
+
+                    <p class="text-muted small">
+                        Se a caixa não for marcada, o sistema usará a data e hora atuais.
+                    </p>
+
+                    <div class="d-flex justify-content-end mt-4">
+                        <a href="{{ url_for('listar_ordens') }}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-success">Confirmar Finalização</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Script para mostrar/esconder o campo de data
+    const checkbox = document.getElementById('checkDataRetroativa');
+    const campoData = document.getElementById('campoDataFechamento');
+
+    checkbox.addEventListener('change', function() {
+        if (this.checked) {
+            campoData.style.display = 'block';
+        } else {
+            campoData.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Editando Cliente: {{ cliente.nome_exibicao }}</h2>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('editar_cliente', id=cliente.id) }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Pessoa</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="tipo_pessoa" id="tipoFisica" value="FISICA" {% if cliente.tipo_pessoa == 'FISICA' %}checked{% endif %}>
+                            <label class="form-check-label" for="tipoFisica">Pessoa Física</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="tipo_pessoa" id="tipoJuridica" value="JURIDICA" {% if cliente.tipo_pessoa == 'JURIDICA' %}checked{% endif %}>
+                            <label class="form-check-label" for="tipoJuridica">Pessoa Jurídica</label>
+                        </div>
+                    </div>
+
+                    <fieldset id="camposFisica">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="cpf" class="form-label">CPF</label>
+                                <input type="text" class="form-control" id="cpf" name="cpf" value="{{ cliente.cpf or '' }}" maxlength="14">
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label for="nome" class="form-label">Nome Completo</label>
+                                <input type="text" class="form-control" id="nome" name="nome" value="{{ cliente.nome or '' }}">
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset id="camposJuridica">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="cnpj" class="form-label">CNPJ</label>
+                                <input type="text" class="form-control" id="cnpj" name="cnpj" value="{{ cliente.cnpj or '' }}" maxlength="18">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="inscricao_estadual" class="form-label">Inscrição Estadual (I.E.)</label>
+                                <input type="text" class="form-control" id="inscricao_estadual" name="inscricao_estadual" value="{{ cliente.inscricao_estadual or '' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="email" class="form-label">E-mail</label>
+                                <input type="email" class="form-control" id="email" name="email" value="{{ cliente.email or '' }}">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="razao_social" class="form-label">Razão Social</label>
+                            <input type="text" class="form-control" id="razao_social" name="razao_social" value="{{ cliente.razao_social or '' }}">
+                        </div>
+                    </fieldset>
+                    
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="telefone" class="form-label">Telefone</label>
+                            <input type="text" class="form-control" id="telefone" name="telefone" value="{{ cliente.telefone or '' }}" maxlength="15">
+                        </div>
+                        <div class="col-md-8 mb-3" id="emailContainerFisica">
+                            <label for="emailFisica" class="form-label">E-mail</label>
+                            <input type="email" class="form-control" id="emailFisica" name="email" value="{{ cliente.email or '' }}">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="cep" class="form-label">CEP</label>
+                            <input type="text" class="form-control" id="cep" name="cep" value="{{ cliente.cep or '' }}" maxlength="9">
+                        </div>
+                        <div class="col-md-7 mb-3">
+                            <label for="rua" class="form-label">Rua</label>
+                            <input type="text" class="form-control" id="rua" name="rua" value="{{ cliente.rua or '' }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="numero" class="form-label">N°</label>
+                            <input type="text" class="form-control" id="numero" name="numero" value="{{ cliente.numero or '' }}">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-5 mb-3">
+                            <label for="bairro" class="form-label">Bairro</label>
+                            <input type="text" class="form-control" id="bairro" name="bairro" value="{{ cliente.bairro or '' }}">
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label for="cidade" class="form-label">Cidade</label>
+                            <input type="text" class="form-control" id="cidade" name="cidade" value="{{ cliente.cidade or '' }}">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label for="uf" class="form-label">UF</label>
+                            <input type="text" class="form-control" id="uf" name="uf" value="{{ cliente.uf or '' }}" maxlength="2">
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('gerenciar_clientes') }}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Seleciona os elementos do formulário
+    const tipoFisicaRadio = document.getElementById('tipoFisica');
+    const tipoJuridicaRadio = document.getElementById('tipoJuridica');
+    const camposFisica = document.getElementById('camposFisica');
+    const camposJuridica = document.getElementById('camposJuridica');
+    const emailContainerFisica = document.getElementById('emailContainerFisica');
+
+    // Inputs que são obrigatórios
+    const nomeInput = document.getElementById('nome');
+    const cpfInput = document.getElementById('cpf');
+    const razaoSocialInput = document.getElementById('razao_social');
+    const cnpjInput = document.getElementById('cnpj');
+
+    function toggleCampos() {
+        if (tipoFisicaRadio.checked) {
+            camposFisica.style.display = 'block';
+            emailContainerFisica.style.display = 'block';
+            camposJuridica.style.display = 'none';
+            nomeInput.required = true;
+            cpfInput.required = true;
+            razaoSocialInput.required = false;
+            cnpjInput.required = false;
+        } else {
+            camposFisica.style.display = 'none';
+            emailContainerFisica.style.display = 'none'; // Esconde o e-mail duplicado de PF
+            camposJuridica.style.display = 'block';
+            nomeInput.required = false;
+            cpfInput.required = false;
+            razaoSocialInput.required = true;
+            cnpjInput.required = true;
+        }
+    }
+
+    tipoFisicaRadio.addEventListener('change', toggleCampos);
+    tipoJuridicaRadio.addEventListener('change', toggleCampos);
+    toggleCampos(); // Estado inicial
+
+    // Aplica as máscaras de formatação com IMask.js
+    IMask(document.getElementById('cpf'), { mask: '000.000.000-00' });
+    IMask(document.getElementById('cnpj'), { mask: '00.000.000/0000-00' });
+    IMask(document.getElementById('cep'), { mask: '00000-000' });
+    IMask(document.getElementById('telefone'), {
+        mask: [
+            { mask: '(00) 0000-0000' },
+            { mask: '(00) 00000-0000' }
+        ]
+    });
+</script>
+{% endblock %}

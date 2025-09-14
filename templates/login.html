@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block body_class %}login-body{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center align-items-center" style="min-height: 80vh;">
+        <div class="col-md-5">
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-4 p-md-5">
+                    
+                    <div class="text-center mb-4">
+                        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo da Empresa" style="max-width: 180px; height: auto;">
+                    </div>
+
+                    <form action="{{ url_for('login') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Nome de Usuário</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Senha</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 mt-3">Entrar</button>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

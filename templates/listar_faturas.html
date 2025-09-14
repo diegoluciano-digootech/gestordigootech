@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0">Faturas Geradas</h2>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">Fatura ID</th>
+                    <th scope="col">Cliente</th>
+                    <th scope="col">Data de Emissão</th>
+                    <th scope="col">Valor Total</th>
+                    <th scope="col" class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fatura in faturas %}
+                <tr>
+                    <th scope="row">#{{ fatura.id }}</th>
+                    <td>{{ fatura.cliente.nome_exibicao }}</td>
+                    <td>{{ fatura.data_emissao.strftime('%d/%m/%Y') }}</td>
+                    <td>R$ {{ "%.2f"|format(fatura.valor_total_faturado) }}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('gerar_fatura_pdf', fatura_id=fatura.id) }}" class="btn btn-info btn-sm" target="_blank">
+                            Imprimir PDF
+                        </a>
+                        <form action="{{ url_for('cancelar_fatura', fatura_id=fatura.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja cancelar esta fatura? As O.S. voltarão para a tela de faturamento.');">
+                            <button type="submit" class="btn btn-danger btn-sm">Cancelar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">Nenhuma fatura foi gerada ainda.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Procura por um parâmetro 'open_pdf' na URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const pdfToOpenId = urlParams.get('open_pdf');
+
+    // Se encontrar o parâmetro...
+    if (pdfToOpenId) {
+        // ...cria a URL para o PDF e abre em uma nova aba
+        const pdfUrl = "{{ url_for('gerar_fatura_pdf', fatura_id=0) }}".replace('0', pdfToOpenId);
+        window.open(pdfUrl, '_blank');
+
+        // Limpa a URL para não abrir o PDF novamente se o usuário atualizar a página
+        window.history.replaceState({}, document.title, "{{ url_for('listar_faturas') }}");
+    }
+});
+</script>
+{% endblock %}

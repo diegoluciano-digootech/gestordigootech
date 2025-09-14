@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Fatura #{{ fatura.id }}</title>
+    <style>
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #333; font-size: 10pt; }
+        .header { text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #005f73; }
+        .header img { max-height: 70px; width: auto; }
+        .section { margin-bottom: 20px; }
+        .section h2 { font-size: 12pt; color: #005f73; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 0; margin-bottom: 15px; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 20px; font-size: 10pt; }
+        .info-item { padding: 4px 0; }
+        .info-item strong { display: block; font-size: 8pt; color: #666; text-transform: uppercase; margin-bottom: 2px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: none; border-bottom: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .grand-total-row td { background-color: #f8f9fa; font-weight: bold; font-size: 12pt; border-top: 2px solid #333; }
+        .footer { text-align: center; margin-top: 30px; font-size: 8pt; color: #777; border-top: 1px solid #eee; padding-top: 10px; }
+        .text-right { text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="header">{% if logo_path %}<img src="{{ logo_path }}">{% endif %}</div>
+
+    <div class="section">
+        <div class="info-grid">
+            <div class="info-item" style="grid-column: span 2;"><strong>CLIENTE</strong> {{ fatura.cliente.nome_exibicao }}</div>
+            <div class="info-item"><strong>FATURA Nº</strong> {{ fatura.id }}</div>
+            <div class="info-item"><strong>EMISSÃO</strong> {{ fatura.data_emissao.strftime('%d/%m/%Y') }}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Ordens de Serviço Inclusas</h2>
+        <table>
+            <thead><tr><th>O.S. Nº</th><th>Data de Conclusão</th><th>Descrição do Serviço</th><th class="text-right">Valor Total</th></tr></thead>
+            <tbody>
+                {% for os in fatura.ordens %}
+                <tr><td>{{ os.id }}</td><td>{{ os.data_fechamento.strftime('%d/%m/%Y') }}</td><td>{{ os.problema|truncate(80) }}</td><td class="text-right">R$ {{ "%.2f"|format(os.valor_total) }}</td></tr>
+                {% endfor %}
+                <tr class="grand-total-row"><td colspan="3">VALOR TOTAL DA FATURA</td><td class="text-right">R$ {{ "%.2f"|format(fatura.valor_total_faturado) }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Detalhamento do Pagamento</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Forma de Pagamento</th>
+                    <th>Vencimento</th>
+                    <th>Detalhes</th>
+                    <th class="text-right">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for pgto in fatura.pagamentos %}
+                {# Primeiro, contamos quantas parcelas do mesmo tipo existem no total #}
+                {% set contagem_parcelas = fatura.pagamentos|selectattr('tipo_pagamento', 'equalto', pgto.tipo_pagamento)|list|length %}
+                <tr>
+                    <td>{{ pgto.tipo_pagamento }}</td>
+                    <td>{{ pgto.data_vencimento.strftime('%d/%m/%Y') }}</td>
+                    <td>
+                        {% if pgto.tipo_pagamento == 'PIX' and pgto.chave_pix %}
+                            Chave PIX: {{ pgto.chave_pix }}
+                        {% elif contagem_parcelas > 1 %}
+                            Parcela {{ pgto.numero_parcelas }} de {{ contagem_parcelas }}
+                        {% endif %}
+                    </td>
+                    <td class="text-right">R$ {{ "%.2f"|format(pgto.valor) }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer"><p>Digootech Informática - (43) 3339-6161</p></div>
+</body>
+</html>

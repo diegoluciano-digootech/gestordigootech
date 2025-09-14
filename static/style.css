@@ -1,0 +1,13 @@
+/* Estilo para o corpo da página de login */
+.login-body {
+    /* Cor de fundo cinza, como na sua print */
+    background-color: #f0f2f5;
+
+    /* --- OU, SE PREFERIR UMA IMAGEM DE FUNDO --- */
+    /* Descomente as 3 linhas abaixo e comente a linha de cima */
+    /*
+    background-image: url('/static/images/background.jpg');
+    background-size: cover;
+    background-position: center;
+    */
+}

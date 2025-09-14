@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <h2 class="h5 mb-0">Adicionar Nova Ordem de Serviço</h2>
+    </div>
+    <div class="card-body">
+        <form action="{{ url_for('adicionar') }}" method="POST">
+            <div class="row">
+                <div class="col-md-8 mb-3">
+                    <label for="cliente_id" class="form-label">Cliente</label>
+                    <select class="form-select" id="cliente_id" name="cliente_id" required>
+                        <option selected disabled value="">Selecione um cliente...</option>
+                        {% for cliente in clientes %}
+                            <option value="{{ cliente.id }}">{{ cliente.nome_exibicao }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label for="data_criacao" class="form-label">Data de Abertura</label>
+                    <input type="datetime-local" class="form-control" id="data_criacao" name="data_criacao">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="problema" class="form-label">Descrição do Problema</label>
+                <textarea class="form-control" id="problema" name="problema" rows="3" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Adicionar O.S.</button>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0">Ordens de Serviço</h2>
+        <form action="{{ url_for('listar_ordens') }}" method="GET" class="d-flex" style="width: 300px;">
+            <input class="form-control me-2" type="search" placeholder="Buscar O.S..." name="q" value="{{ search_term or '' }}">
+            <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+        </form>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Cliente</th>
+                    <th scope="col">Endereço</th>
+                    <th scope="col">Data</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Valor Total</th>
+                    <th scope="col">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ordem in ordens %}
+                <tr>
+                    <th scope="row">{{ ordem.id }}</th>
+                    <td><a href="{{ url_for('detalhe_os', id=ordem.id) }}">{{ ordem.cliente.nome_exibicao }}</a></td>
+                    <td>
+                        {% if ordem.cliente.rua %}
+                            {{ ordem.cliente.rua }}, {{ ordem.cliente.numero }} - {{ ordem.cliente.bairro }}
+                        {% endif %}
+                    </td>
+                    <td>{{ ordem.data_criacao.strftime('%d/%m/%Y') }}</td>
+                    <td>
+                        {% if ordem.status == 'Aberta' %}
+                            <span class="badge bg-warning">{{ ordem.status }}</span>
+                        {% else %}
+                            <span class="badge bg-success">{{ ordem.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>R$ {{ "%.2f"|format(ordem.valor_total) }}</td>
+                    <td class="text-end">
+                        {% if ordem.status == 'Aberta' %}
+                            <a href="{{ url_for('finalizar_os', id=ordem.id) }}" class="btn btn-info btn-sm">Finalizar</a>
+                        {% else %}
+                            <a href="{{ url_for('atualizar', id=ordem.id) }}" class="btn btn-secondary btn-sm">Reabrir</a>
+                        {% endif %}
+                        <a href="{{ url_for('deletar', id=ordem.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Tem certeza que deseja deletar?');">
+                            Deletar
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Executa o script apenas quando o documento estiver totalmente carregado
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ativa o Select2 para o campo de cliente
+        // Usando o seletor jQuery '$' que já carregamos para o Select2
+        $('#cliente_id').select2({
+            theme: "bootstrap-5"
+        });
+
+        // --- CÓDIGO PARA A DATA DE ABERTURA ---
+        const dataInput = document.getElementById('data_criacao');
+        
+        // Verifica se o elemento realmente existe na página
+        if (dataInput) {
+            const agora = new Date();
+            agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+            const valorPadraoData = agora.toISOString().slice(0, 16);
+            dataInput.value = valorPadraoData;
+        } else {
+            console.error("Elemento com id 'data_criacao' não foi encontrado.");
+        }
+    });
+</script>
+{% endblock %}

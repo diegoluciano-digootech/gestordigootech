@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Ordens de Serviço</title>
+    <style>
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #333; font-size: 9pt; }
+        .header { text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #005f73; position: relative; }
+        .header img { max-height: 70px; width: auto; }
+        h1 { font-size: 16pt; color: #005f73; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: none; border-bottom: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .text-end { text-align: right; }
+        .badge { display: inline-block; padding: .25em .6em; font-size: 75%; font-weight: 700; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: .25rem; color: #fff;}
+        .bg-warning { background-color: #ffc107;}
+        .bg-success { background-color: #198754;}
+        .footer { text-align: center; margin-top: 30px; font-size: 8pt; color: #777; border-top: 1px solid #eee; padding-top: 10px; }
+        tfoot td { font-weight: bold; font-size: 11pt; border-top: 2px solid #333; background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if logo_path %}
+            <img src="{{ logo_path }}">
+        {% endif %}
+        <h1>Relatório de Ordens de Serviço</h1>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>OS</th>
+                <th>Cliente</th>
+                <th>Data</th>
+                <th>Status</th>
+                <th class="text-end">Valor Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ordem in ordens %}
+            <tr>
+                <td>{{ ordem.id }}</td>
+                <td>
+                    {% if ordem.cliente %}
+                        {{ ordem.cliente.nome_exibicao }}
+                    {% else %}
+                        CLIENTE REMOVIDO
+                    {% endif %}
+                </td>
+                <td>{{ ordem.data_criacao.strftime('%d/%m/%Y') }}</td>
+                <td>
+                    {% if ordem.status == 'Aberta' %}
+                        <span class="badge bg-warning">{{ ordem.status }}</span>
+                    {% else %}
+                        <span class="badge bg-success">{{ ordem.status }}</span>
+                    {% endif %}
+                </td>
+                <td class="text-end">R$ {{ "%.2f"|format(ordem.valor_total) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center;">Nenhuma Ordem de Serviço encontrada.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="4">TOTAL GERAL DO RELATÓRIO</td>
+                <td class="text-end">R$ {{ "%.2f"|format(total_relatorio) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="footer">
+        <p>Relatório gerado em {{ data_geracao.strftime('%d/%m/%Y às %H:%M') }}</p>
+    </div>
+</body>
+</html>

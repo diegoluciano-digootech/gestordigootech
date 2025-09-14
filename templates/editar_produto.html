@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Editando Produto: {{ produto.descricao }}</h2>
+                <form action="{{ url_for('deletar_produto', produto_id=produto.id) }}" method="POST" onsubmit="return confirm('ATENÇÃO: A exclusão é permanente. Deseja continuar?');">
+                    <button type="submit" class="btn btn-danger btn-sm">Excluir Produto</button>
+                </form>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('editar_produto', produto_id=produto.id) }}" method="POST">
+                    {% include '_form_produto.html' %}
+                    <div class="d-flex justify-content-end mt-3">
+                        <a href="{{ url_for('estoque') }}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const valorCustoInput = document.getElementById('valor_custo');
+    const margemLucroInput = document.getElementById('margem_lucro');
+    const valorVendaInput = document.getElementById('valor_venda');
+    function calcularValorVenda() {
+        const custo = parseFloat(valorCustoInput.value) || 0;
+        const margem = parseFloat(margemLucroInput.value) || 0;
+        const venda = custo * (1 + (margem / 100));
+        valorVendaInput.value = venda.toFixed(2);
+    }
+    calcularValorVenda();
+    valorCustoInput.addEventListener('input', calcularValorVenda);
+    margemLucroInput.addEventListener('input', calcularValorVenda);
+});
+</script>
+{% endblock %}

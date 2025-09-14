@@ -1,0 +1,11 @@
+Flask
+Flask-SQLAlchemy
+Flask-Login
+Werkzeug
+requests
+python-dateutil
+validate-docbr
+pandas
+openpyxl
+WeasyPrint
+gunicorn

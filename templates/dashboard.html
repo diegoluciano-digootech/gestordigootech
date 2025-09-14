@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12"><h2 class="h4">Dashboard</h2></div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm"><div class="card-body"><h5 class="card-title text-muted">Total Faturado</h5><p class="card-text h2 text-success">R$ {{ "%.2f"|format(total_faturado) }}</p></div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm"><div class="card-body"><h5 class="card-title text-muted">O.S. Abertas</h5><p class="card-text h2 text-warning">{{ os_abertas }}</p></div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm"><div class="card-body"><h5 class="card-title text-muted">Finalizadas no Mês</h5><p class="card-text h2 text-info">{{ os_finalizadas_mes }}</p></div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center shadow-sm"><div class="card-body"><h5 class="card-title text-muted">Ticket Médio</h5><p class="card-text h2 text-primary">R$ {{ "%.2f"|format(ticket_medio) }}</p></div></div>
+    </div>
+</div>
+<div class="card shadow-sm mb-4">
+    <div class="card-header"><h2 class="h5 mb-0">Faturamento Mensal (Últimos 6 Meses)</h2></div>
+    <div class="card-body">
+        <canvas id="myChart"></canvas>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Executa apenas quando o documento estiver pronto
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('myChart');
+        if (ctx) { // Garante que o elemento existe antes de tentar criar o gráfico
+            const chartLabels = {{ chart_labels|tojson }};
+            const chartData = {{ chart_data|tojson }};
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'Faturamento R$',
+                        data: chartData,
+                        backgroundColor: 'rgba(0, 123, 255, 0.5)',
+                        borderColor: 'rgba(0, 123, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    return 'R$ ' + value.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

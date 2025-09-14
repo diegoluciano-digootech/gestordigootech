@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header"><h2 class="h5 mb-0">Contas a Receber</h2></div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead><tr><th scope="col">Cliente</th><th scope="col">Fatura Nº</th><th scope="col">Detalhes</th><th scope="col">Vencimento</th><th scope="col">Status</th><th scope="col" class="text-end">Valor</th><th scope="col" class="text-end">Ações</th></tr></thead>
+            <tbody>
+                {% for conta in contas %}
+                <tr class="{{ 'table-light text-muted' if conta.status == 'Recebido' else '' }}">
+                    <td>{{ conta.faturamento.cliente.nome_exibicao if conta.faturamento.cliente else 'N/A' }}</td>
+                    <td><a href="{{ url_for('gerar_fatura_pdf', fatura_id=conta.faturamento.id) }}" target="_blank">#{{ conta.faturamento.id }}</a></td>
+                    <td>
+                        {% set contagem_parcelas = conta.faturamento.pagamentos|length %}
+                        {{ conta.tipo_pagamento }} {% if contagem_parcelas > 1 %} ({{ conta.numero_parcelas }}/{{ contagem_parcelas }}) {% endif %}
+                    </td>
+                    <td>{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
+                    <td>
+                        {% if conta.status == 'Recebido' %}
+                            <span class="badge bg-success">Recebido</span>
+                        {% else %}
+                            {% set dias_para_vencer = (conta.data_vencimento - today_date).days %}
+                            {% if dias_para_vencer < 0 %}
+                                <span class="badge bg-danger">Vencido ({{ dias_para_vencer * -1 }}d)</span>
+                            {% elif dias_para_vencer <= 7 %}
+                                <span class="badge bg-warning text-dark">A Vencer ({{ dias_para_vencer }}d)</span>
+                            {% else %}
+                                <span class="badge bg-primary">Pendente</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td class="text-end">R$ {{ "%.2f"|format(conta.valor) }}</td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            {% if conta.status == 'Pendente' %}
+                                <form action="{{ url_for('marcar_como_recebido', pagamento_id=conta.id) }}" method="POST" onsubmit="return confirm('Confirmar o recebimento deste valor?');"><button type="submit" class="btn btn-success btn-sm">Receber</button></form>
+                            {% else %}
+                                <form action="{{ url_for('estornar_recebimento', pagamento_id=conta.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja estornar este recebimento?');"><button type="submit" class="btn btn-danger btn-sm">Estornar</button></form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center">Nenhuma conta a receber encontrada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

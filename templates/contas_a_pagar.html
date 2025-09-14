@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header"><h2 class="h5 mb-0">Adicionar Nova Conta a Pagar</h2></div>
+    <div class="card-body">
+        <form action="{{ url_for('gerenciar_contas_a_pagar') }}" method="POST">
+            <div class="row"><div class="col-md-12 mb-3"><label for="descricao" class="form-label">Descrição</label><input type="text" class="form-control" id="descricao" name="descricao" required></div></div>
+            <div class="row">
+                <div class="col-md-5 mb-3"><label for="fornecedor_id" class="form-label">Fornecedor</label><select class="form-select" id="fornecedor_id" name="fornecedor_id"><option value="">(Nenhum)</option>{% for fornecedor in fornecedores %}<option value="{{ fornecedor.id }}">{{ fornecedor.razao_social }}</option>{% endfor %}</select></div>
+                <div class="col-md-2 mb-3"><label for="valor" class="form-label">Valor Total</label><div class="input-group"><span class="input-group-text">R$</span><input type="number" step="0.01" class="form-control" id="valor" name="valor" required></div></div>
+                <div class="col-md-2 mb-3"><label for="data_vencimento" class="form-label">1º Vencimento</label><input type="date" class="form-control" id="data_vencimento" name="data_vencimento" required></div>
+                <div class="col-md-2 mb-3"><label for="num_parcelas" class="form-label">Nº de Parcelas</label><input type="number" class="form-control" id="num_parcelas" name="num_parcelas" value="1" min="1"></div>
+                <div class="col-md-1 d-flex align-items-end"><button type="submit" class="btn btn-primary w-100">Adicionar</button></div>
+            </div>
+            <input type="hidden" name="data_emissao" value="{{ today_date.strftime('%Y-%m-%d') }}">
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header"><h2 class="h5 mb-0">Contas a Pagar Cadastradas</h2></div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead><tr><th scope="col">Descrição</th><th scope="col">Fornecedor</th><th scope="col">Vencimento</th><th scope="col">Status</th><th scope="col" class="text-end">Valor</th><th scope="col" class="text-end">Ações</th></tr></thead>
+            <tbody>
+                {% for conta in contas %}
+                <tr class="{{ 'table-light text-muted' if conta.status == 'Pago' else '' }}">
+                    <td>{{ conta.descricao }}</td>
+                    <td>{{ conta.fornecedor.razao_social if conta.fornecedor else 'N/A' }}</td>
+                    <td>{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
+                    <td>
+                        {% if conta.status == 'Pago' %}
+                            <span class="badge bg-success">Pago</span>
+                        {% else %}
+                            {% set dias_para_vencer = (conta.data_vencimento - today_date).days %}
+                            {% if dias_para_vencer < 0 %}
+                                <span class="badge bg-danger">Vencido ({{ dias_para_vencer * -1 }}d)</span>
+                            {% elif dias_para_vencer <= 7 %}
+                                <span class="badge bg-warning text-dark">A Vencer ({{ dias_para_vencer }}d)</span>
+                            {% else %}
+                                <span class="badge bg-primary">Pendente</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td class="text-end">R$ {{ "%.2f"|format(conta.valor) }}</td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            <a href="{{ url_for('editar_conta_a_pagar', conta_id=conta.id) }}" class="btn btn-secondary btn-sm">Editar</a>
+                            {% if conta.status == 'Pendente' %}
+                            <form action="{{ url_for('marcar_como_pago', conta_id=conta.id) }}" method="POST" class="ms-1" onsubmit="return confirm('Confirmar o pagamento desta conta?');"><button type="submit" class="btn btn-success btn-sm">Pagar</button></form>
+                            {% else %}
+                            <form action="{{ url_for('estornar_pagamento', conta_id=conta.id) }}" method="POST" class="ms-1" onsubmit="return confirm('Deseja estornar este pagamento?');"><button type="submit" class="btn btn-warning btn-sm">Estornar</button></form>
+                            {% endif %}
+                            <form action="{{ url_for('deletar_conta_a_pagar', conta_id=conta.id) }}" method="POST" class="ms-1" onsubmit="return confirm('ATENÇÃO: Esta ação é permanente. Deseja excluir este lançamento?');"><button type="submit" class="btn btn-danger btn-sm">Excluir</button></form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        $('#fornecedor_id').select2({
+            theme: "bootstrap-5",
+            placeholder: "Selecione um fornecedor"
+        });
+    });
+</script>
+{% endblock %}

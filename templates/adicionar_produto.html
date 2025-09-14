@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-sm">
+            <div class="card-header"><h2 class="h5 mb-0">Adicionar Novo Produto</h2></div>
+            <div class="card-body">
+                <form action="{{ url_for('adicionar_produto') }}" method="POST">
+                    {% include '_form_produto.html' %}
+                    <div class="d-flex justify-content-end mt-3">
+                        <a href="{{ url_for('estoque') }}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Cadastrar Produto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const valorCustoInput = document.getElementById('valor_custo');
+    const margemLucroInput = document.getElementById('margem_lucro');
+    const valorVendaInput = document.getElementById('valor_venda');
+    function calcularValorVenda() {
+        const custo = parseFloat(valorCustoInput.value) || 0;
+        const margem = parseFloat(margemLucroInput.value) || 0;
+        const venda = custo * (1 + (margem / 100));
+        valorVendaInput.value = venda.toFixed(2);
+    }
+    calcularValorVenda();
+    valorCustoInput.addEventListener('input', calcularValorVenda);
+    margemLucroInput.addEventListener('input', calcularValorVenda);
+});
+</script>
+{% endblock %}
