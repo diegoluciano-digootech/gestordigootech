@@ -314,32 +314,32 @@ def listar_faturas():
     faturas = Faturamento.query.order_by(Faturamento.data_emissao.desc()).all()
     return render_template('listar_faturas.html', faturas=faturas)
     
+# Rota para CANCELAR uma fatura e liberar as O.S.
 @app.route('/faturamento/cancelar/<int:fatura_id>', methods=['POST'])
 @login_required
 def cancelar_fatura(fatura_id):
     fatura_para_cancelar = Faturamento.query.get_or_404(fatura_id)
 
+    # AMARRAÇÃO: Verifica se existe algum pagamento já recebido nesta fatura
+    pagamentos_recebidos = Pagamento.query.filter_by(faturamento_id=fatura_id, status='Recebido').first()
+    if pagamentos_recebidos:
+        flash(f'A Fatura #{fatura_id} não pode ser cancelada pois possui pagamentos recebidos. Estorne os recebimentos primeiro.', 'danger')
+        return redirect(url_for('relatorio_faturamento'))
+
     try:
-        # 1. Pega todas as O.S. associadas a esta fatura
         ordens_associadas = fatura_para_cancelar.ordens.all()
-        
-        # 2. Muda o status de cada O.S. de volta para 'Finalizada'
         for os in ordens_associadas:
             os.status = 'Finalizada'
         
-        # 3. Deleta a fatura problemática
         db.session.delete(fatura_para_cancelar)
-        
-        # 4. Salva todas as alterações no banco de dados
         db.session.commit()
-        
         flash(f'Fatura #{fatura_id} cancelada com sucesso! As O.S. foram liberadas.', 'success')
     except Exception as e:
         db.session.rollback()
         logging.error(f"Erro ao cancelar fatura: {e}")
         flash('Ocorreu um erro ao tentar cancelar a fatura.', 'danger')
 
-    return redirect(url_for('listar_faturas'))
+    return redirect(url_for('relatorio_faturamento'))
 
 # --- ROTAS DE AUTENTICAÇÃO (sem alterações) ---
 @app.route('/register', methods=['GET', 'POST'])
@@ -438,17 +438,18 @@ def dashboard():
                            chart_labels=chart_labels,
                            chart_data=chart_data)
 
-# Rota para ATUALIZAR status de uma O.S. (com verificação)
+# Rota para ATUALIZAR status de uma O.S. (reabrir)
 @app.route('/atualizar/<int:id>')
 @login_required
 def atualizar(id):
     os_para_atualizar = OrdemServico.query.get_or_404(id)
 
-    # if os_para_atualizar.status == 'Faturada':
-    #     flash('Não é possível reabrir uma O.S. que já foi faturada.', 'danger')
-    #     return redirect(url_for('listar_ordens'))
+    # AMARRAÇÃO: Bloqueia reabertura se a O.S. já foi faturada
+    if os_para_atualizar.status == 'Faturada':
+        flash(f'A O.S. #{id} não pode ser reaberta pois já foi faturada. Cancele o faturamento primeiro.', 'danger')
+        return redirect(url_for('listar_ordens'))
 
-    if os_para_atualizar.status in ['Finalizada', 'Faturada']: # Permite reabrir Faturada também
+    if os_para_atualizar.status == 'Finalizada':
         os_para_atualizar.status = 'Aberta'
         os_para_atualizar.data_fechamento = None
         try:
@@ -497,8 +498,9 @@ def detalhe_os(id):
     os = OrdemServico.query.get_or_404(id)
 
     if request.method == 'POST':
-        if os.status == 'Faturada':
-            flash('Não é possível alterar uma O.S. que já foi faturada.', 'danger')
+        # AMARRAÇÃO: Só permite alterar se o status for 'Aberta'
+        if os.status != 'Aberta':
+            flash(f'A O.S. #{os.id} não pode ser modificada pois o status é "{os.status}". É necessário reabri-la primeiro.', 'warning')
             return redirect(url_for('detalhe_os', id=os.id))
 
         os.problema = request.form['problema'].upper()
@@ -511,6 +513,9 @@ def detalhe_os(id):
             flash(f'Erro ao atualizar a Ordem de Serviço: {e}', 'danger')
         return redirect(url_for('detalhe_os', id=os.id))
 
+    produtos = Produto.query.order_by(Produto.descricao).all()
+    return render_template('detalhe_os.html', os=os, produtos=produtos)
+
     # Lógica GET atualizada para buscar os produtos
     produtos = Produto.query.order_by(Produto.descricao).all()
     return render_template('detalhe_os.html', os=os, produtos=produtos)
@@ -520,20 +525,18 @@ def detalhe_os(id):
 @login_required
 def adicionar_peca(os_id):
     os = OrdemServico.query.get_or_404(os_id)
-    if os.status == 'Faturada':
-        flash('Não é possível adicionar peças a uma O.S. faturada.', 'danger')
+    # AMARRAÇÃO: Só permite adicionar se o status for 'Aberta'
+    if os.status != 'Aberta':
+        flash(f'Não é possível adicionar peças na O.S. #{os.id} pois o status é "{os.status}".', 'warning')
         return redirect(url_for('detalhe_os', id=os_id))
 
     try:
         produto_id = request.form['produto_id']
         quantidade = int(request.form['quantidade'])
-        
         produto = Produto.query.get(produto_id)
         if not produto:
             flash('Produto não encontrado.', 'danger')
             return redirect(url_for('detalhe_os', id=os_id))
-
-        # VERIFICAÇÃO DE ESTOQUE
         if produto.quantidade_estoque < quantidade:
             flash(f'Estoque insuficiente para "{produto.descricao}". Disponível: {produto.quantidade_estoque}', 'danger')
             return redirect(url_for('detalhe_os', id=os_id))
@@ -544,9 +547,7 @@ def adicionar_peca(os_id):
             valor_unitario=produto.valor_venda,
             ordem_servico_id=os_id
         )
-        # DÁ BAIXA NO ESTOQUE
         produto.quantidade_estoque -= quantidade
-        
         db.session.add(nova_peca)
         db.session.commit()
         flash('Peça adicionada e estoque atualizado com sucesso!', 'success')
@@ -563,12 +564,12 @@ def deletar_peca(peca_id):
     peca_para_deletar = Peca.query.get_or_404(peca_id)
     os_id = peca_para_deletar.ordem_servico.id
 
-    if peca_para_deletar.ordem_servico.status == 'Faturada':
-        flash('Não é possível remover peças de uma O.S. faturada.', 'danger')
+    # AMARRAÇÃO: Só permite remover se o status for 'Aberta'
+    if peca_para_deletar.ordem_servico.status != 'Aberta':
+        flash(f'Não é possível remover peças da O.S. #{os_id} pois o status é "{peca_para_deletar.ordem_servico.status}".', 'warning')
         return redirect(url_for('detalhe_os', id=os_id))
         
     try:
-        # Encontra o produto correspondente para devolver ao estoque
         produto = Produto.query.filter_by(descricao=peca_para_deletar.descricao).first()
         if produto:
             produto.quantidade_estoque += peca_para_deletar.quantidade
@@ -1215,11 +1216,18 @@ def estornar_pagamento(conta_id):
         flash(f'Erro ao estornar a conta: {e}', 'danger')
     return redirect(url_for('gerenciar_contas_a_pagar'))
 
-# Rota para DELETAR uma conta a pagar
+# Rota para DELETAR uma conta a pagar (com verificação de status)
 @app.route('/conta/deletar/<int:conta_id>', methods=['POST'])
 @login_required
 def deletar_conta_a_pagar(conta_id):
     conta = ContaPagar.query.get_or_404(conta_id)
+    
+    # AMARRAÇÃO: Verifica se a conta já foi paga
+    if conta.status == 'Pago':
+        flash(f'A conta "{conta.descricao}" não pode ser excluída pois já foi paga. É necessário estornar o pagamento primeiro.', 'danger')
+        return redirect(url_for('gerenciar_contas_a_pagar'))
+
+    # Se estiver pendente, prossegue com a exclusão
     try:
         db.session.delete(conta)
         db.session.commit()
@@ -1227,6 +1235,7 @@ def deletar_conta_a_pagar(conta_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao deletar a conta: {e}', 'danger')
+    
     return redirect(url_for('gerenciar_contas_a_pagar'))
 
 # Rota para EDITAR uma conta a pagar
@@ -1392,12 +1401,25 @@ def editar_produto(produto_id):
     # GET: Mostra a página de edição com os dados do produto
     return render_template('editar_produto.html', produto=produto)
 
-# Rota para DELETAR um produto
+# Rota para DELETAR um produto (com verificação de movimentação)
 @app.route('/produtos/deletar/<int:produto_id>', methods=['POST'])
 @login_required
 def deletar_produto(produto_id):
     produto = Produto.query.get_or_404(produto_id)
-    # Adicionar verificação se o produto está em alguma O.S. no futuro
+    
+    # VERIFICA SE HOUVE ENTRADA DO PRODUTO NO ESTOQUE
+    movimento_entrada = EntradaEstoqueItem.query.filter_by(produto_id=produto.id).first()
+    
+    # VERIFICA SE O PRODUTO FOI USADO EM ALGUMA O.S.
+    # (Baseado na descrição, como está atualmente no modelo Peca)
+    movimento_saida = Peca.query.filter_by(descricao=produto.descricao).first()
+
+    # Se encontrou qualquer movimentação, bloqueia a exclusão
+    if movimento_entrada or movimento_saida:
+        flash(f'Não é possível excluir o produto "{produto.descricao}", pois ele já possui movimentações de estoque ou foi usado em Ordens de Serviço.', 'danger')
+        return redirect(url_for('estoque'))
+
+    # Se não houver movimentações, prossegue com a exclusão
     try:
         db.session.delete(produto)
         db.session.commit()
@@ -1405,6 +1427,7 @@ def deletar_produto(produto_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao deletar o produto: {e}', 'danger')
+    
     return redirect(url_for('estoque'))
 
 # Rota para a tela de ENTRADA DE ESTOQUE
