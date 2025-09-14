@@ -30,6 +30,7 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('estoque') }}">Estoque</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('entrada_estoque') }}">Entrada de Estoque</a></li>
                             </ul>
                     </li>
                     <li class="nav-item dropdown">
@@ -51,6 +52,8 @@
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('relatorio_os') }}">Relatório OS</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('relatorio_faturamento') }}">Relatório de Faturas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('relatorio_fluxo_caixa') }}">Fluxo de Caixa</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('relatorio_faturamento_cliente') }}">Faturamento por Cliente</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">

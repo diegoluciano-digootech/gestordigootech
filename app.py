@@ -9,7 +9,6 @@ import datetime
 import pathlib
 from flask import Flask, Response, jsonify, redirect, render_template, request, send_from_directory, url_for, flash, abort
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, extract, or_, case
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
@@ -19,8 +18,8 @@ from validate_docbr import CPF, CNPJ
 import requests
 from dateutil.relativedelta import relativedelta
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, extract, or_, case, text # Adicione , text aqui
-from sqlalchemy.exc import IntegrityError, OperationalError # Adicione , OperationalError aqui
+from sqlalchemy import func, extract, or_, case, text, desc
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 # --- Configuração Inicial ---
 app = Flask(__name__)
@@ -209,6 +208,24 @@ class Produto(db.Model):
 
     def __repr__(self):
         return f'<Produto {self.descricao}>'
+    
+# Modelo para o cabeçalho da Entrada de Estoque (Nota Fiscal, etc.)
+class EntradaEstoque(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data_entrada = db.Column(db.Date, nullable=False, default=datetime.date.today)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=True)
+    observacao = db.Column(db.String(300))
+    fornecedor = db.relationship('Fornecedor')
+    itens = db.relationship('EntradaEstoqueItem', backref='entrada', cascade="all, delete-orphan")
+
+# Modelo para cada item dentro de uma Entrada de Estoque
+class EntradaEstoqueItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    entrada_id = db.Column(db.Integer, db.ForeignKey('entrada_estoque.id'), nullable=False)
+    produto_id = db.Column(db.Integer, db.ForeignKey('produto.id'), nullable=False)
+    quantidade = db.Column(db.Integer, nullable=False)
+    valor_custo_unitario = db.Column(db.Float, nullable=False)
+    produto = db.relationship('Produto')
     
 # ROTA DE FATURAMENTO ATUALIZADA (POST)
 @app.route('/faturamento', methods=['GET', 'POST'])
@@ -498,7 +515,7 @@ def detalhe_os(id):
     produtos = Produto.query.order_by(Produto.descricao).all()
     return render_template('detalhe_os.html', os=os, produtos=produtos)
 
-# Rota para ADICIONAR uma peça (agora baseada no cadastro de produtos)
+# Rota para ADICIONAR uma peça (agora com baixa de estoque)
 @app.route('/os/<int:os_id>/adicionar_peca', methods=['POST'])
 @login_required
 def adicionar_peca(os_id):
@@ -516,36 +533,53 @@ def adicionar_peca(os_id):
             flash('Produto não encontrado.', 'danger')
             return redirect(url_for('detalhe_os', id=os_id))
 
+        # VERIFICAÇÃO DE ESTOQUE
+        if produto.quantidade_estoque < quantidade:
+            flash(f'Estoque insuficiente para "{produto.descricao}". Disponível: {produto.quantidade_estoque}', 'danger')
+            return redirect(url_for('detalhe_os', id=os_id))
+
         nova_peca = Peca(
             descricao=produto.descricao, 
             quantidade=quantidade, 
             valor_unitario=produto.valor_venda,
             ordem_servico_id=os_id
         )
+        # DÁ BAIXA NO ESTOQUE
+        produto.quantidade_estoque -= quantidade
+        
         db.session.add(nova_peca)
         db.session.commit()
-        flash('Peça adicionada com sucesso!', 'success')
+        flash('Peça adicionada e estoque atualizado com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao adicionar a peça: {e}', 'danger')
     
     return redirect(url_for('detalhe_os', id=os_id))
 
-# Rota para DELETAR uma peça (com verificação)
+# Rota para DELETAR uma peça (agora com estorno de estoque)
 @app.route('/peca/deletar/<int:peca_id>')
 @login_required
 def deletar_peca(peca_id):
     peca_para_deletar = Peca.query.get_or_404(peca_id)
     os_id = peca_para_deletar.ordem_servico.id
+
     if peca_para_deletar.ordem_servico.status == 'Faturada':
         flash('Não é possível remover peças de uma O.S. faturada.', 'danger')
         return redirect(url_for('detalhe_os', id=os_id))
+        
     try:
+        # Encontra o produto correspondente para devolver ao estoque
+        produto = Produto.query.filter_by(descricao=peca_para_deletar.descricao).first()
+        if produto:
+            produto.quantidade_estoque += peca_para_deletar.quantidade
+        
         db.session.delete(peca_para_deletar)
         db.session.commit()
-        flash('Peça removida com sucesso!', 'success')
-    except:
-        flash('Erro ao remover a peça.', 'danger')
+        flash('Peça removida e estoque estornado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao remover a peça: {e}', 'danger')
+    
     return redirect(url_for('detalhe_os', id=os_id))
     
 @app.route('/faturamento/pdf/<int:fatura_id>')
@@ -1372,6 +1406,154 @@ def deletar_produto(produto_id):
         db.session.rollback()
         flash(f'Erro ao deletar o produto: {e}', 'danger')
     return redirect(url_for('estoque'))
+
+# Rota para a tela de ENTRADA DE ESTOQUE
+@app.route('/estoque/entrada', methods=['GET', 'POST'])
+@login_required
+def entrada_estoque():
+    if request.method == 'POST':
+        try:
+            # Pega os dados do cabeçalho da entrada
+            fornecedor_id = request.form.get('fornecedor_id') if request.form.get('fornecedor_id') else None
+            nova_entrada = EntradaEstoque(
+                data_entrada=datetime.datetime.strptime(request.form['data_entrada'], '%Y-%m-%d').date(),
+                fornecedor_id=fornecedor_id,
+                observacao=request.form.get('observacao', '').upper()
+            )
+            db.session.add(nova_entrada)
+            
+            # Pega os dados de cada item da nota
+            produtos_ids = request.form.getlist('produto_id[]')
+            quantidades = request.form.getlist('quantidade[]')
+            custos = request.form.getlist('custo[]')
+
+            for i in range(len(produtos_ids)):
+                produto_id = int(produtos_ids[i])
+                quantidade = int(quantidades[i])
+                custo = float(custos[i])
+                
+                # Adiciona o item à entrada de estoque
+                item = EntradaEstoqueItem(
+                    entrada=nova_entrada,
+                    produto_id=produto_id,
+                    quantidade=quantidade,
+                    valor_custo_unitario=custo
+                )
+                db.session.add(item)
+                
+                # ATUALIZA O ESTOQUE DO PRODUTO
+                produto = Produto.query.get(produto_id)
+                produto.quantidade_estoque += quantidade
+                # Opcional: Atualiza o valor de custo do produto com o da última compra
+                produto.valor_custo = custo
+
+            db.session.commit()
+            flash('Entrada de estoque registrada com sucesso!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ocorreu um erro ao registrar a entrada: {e}', 'danger')
+        
+        return redirect(url_for('estoque'))
+
+    # Lógica GET para exibir o formulário
+    fornecedores = Fornecedor.query.order_by(Fornecedor.razao_social).all()
+    produtos = Produto.query.order_by(Produto.descricao).all()
+    # CORREÇÃO APLICADA AQUI
+    return render_template('entrada_estoque.html', 
+                           fornecedores=fornecedores, 
+                           produtos=produtos, 
+                           today_date=datetime.date.today())
+
+# Rota para o RELATÓRIO DE FLUXO DE CAIXA
+@app.route('/relatorio/fluxo-caixa')
+@login_required
+def relatorio_fluxo_caixa():
+    # Pega os filtros de data da URL
+    data_inicio_str = request.args.get('data_inicio')
+    data_fim_str = request.args.get('data_fim')
+
+    # Converte as strings de data para objetos date, se existirem
+    data_inicio = datetime.datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else None
+    data_fim = datetime.datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else None
+
+    # Busca todas as contas a receber pendentes
+    query_receber = Pagamento.query.filter(Pagamento.status == 'Pendente')
+    if data_inicio:
+        query_receber = query_receber.filter(Pagamento.data_vencimento >= data_inicio)
+    if data_fim:
+        query_receber = query_receber.filter(Pagamento.data_vencimento <= data_fim)
+    contas_a_receber = query_receber.all()
+
+    # Busca todas as contas a pagar pendentes
+    query_pagar = ContaPagar.query.filter(ContaPagar.status == 'Pendente')
+    if data_inicio:
+        query_pagar = query_pagar.filter(ContaPagar.data_vencimento >= data_inicio)
+    if data_fim:
+        query_pagar = query_pagar.filter(ContaPagar.data_vencimento <= data_fim)
+    contas_a_pagar = query_pagar.all()
+
+    # Junta as duas listas em uma só
+    lancamentos = []
+    for conta in contas_a_receber:
+        lancamentos.append({
+            'data': conta.data_vencimento,
+            'descricao': f"Recebimento Fatura #{conta.faturamento.id}",
+            'entrada': conta.valor,
+            'saida': 0
+        })
+    for conta in contas_a_pagar:
+        lancamentos.append({
+            'data': conta.data_vencimento,
+            'descricao': conta.descricao,
+            'entrada': 0,
+            'saida': conta.valor
+        })
+
+    # Ordena a lista unificada por data
+    lancamentos.sort(key=lambda x: x['data'])
+
+    # Calcula o saldo corrente
+    saldo = 0
+    for lancamento in lancamentos:
+        saldo += lancamento['entrada'] - lancamento['saida']
+        lancamento['saldo'] = saldo
+
+    return render_template('fluxo_caixa.html', 
+                           lancamentos=lancamentos,
+                           data_inicio=data_inicio_str,
+                           data_fim=data_fim_str)
+
+# Rota para o RELATÓRIO DE FATURAMENTO POR CLIENTE
+@app.route('/relatorio/faturamento-por-cliente')
+@login_required
+def relatorio_faturamento_cliente():
+    data_inicio_str = request.args.get('data_inicio')
+    data_fim_str = request.args.get('data_fim')
+
+    data_inicio = datetime.datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else None
+    data_fim = datetime.datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else None
+
+    # Inicia a consulta base
+    query = db.session.query(
+        Cliente,
+        func.count(Faturamento.id).label('num_faturas'),
+        func.sum(Pagamento.valor).label('total_faturado')
+    ).join(Faturamento, Faturamento.cliente_id == Cliente.id)\
+     .join(Pagamento, Pagamento.faturamento_id == Faturamento.id)
+
+    # Aplica os filtros de data
+    if data_inicio:
+        query = query.filter(Faturamento.data_emissao >= data_inicio)
+    if data_fim:
+        query = query.filter(Faturamento.data_emissao <= data_fim)
+
+    # Agrupa por cliente e ordena pelo maior faturamento
+    faturamento_por_cliente = query.group_by(Cliente.id).order_by(desc('total_faturado')).all()
+
+    return render_template('relatorio_faturamento_cliente.html',
+                           faturamento_por_cliente=faturamento_por_cliente,
+                           data_inicio=data_inicio_str,
+                           data_fim=data_fim_str)
 
 # --- Inicialização ---
 if __name__ == "__main__":

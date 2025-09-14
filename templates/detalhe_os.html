@@ -11,27 +11,8 @@
 
 <div class="row">
     <div class="col-md-7">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header">Informações do Cliente e Serviço</div>
-            <div class="card-body">
-                <p><strong>Cliente:</strong> {{ os.cliente.nome_exibicao }}</p>
-                <p><strong>Telefone:</strong> {{ os.cliente.telefone_formatado }}</p>
-                <hr>
-                <p><strong>Data de Abertura:</strong> {{ os.data_criacao.strftime('%d/%m/%Y às %H:%M') }}</p>
-                {% if os.data_fechamento %}<p><strong>Data de Fechamento:</strong> {{ os.data_fechamento.strftime('%d/%m/%Y às %H:%M') }}</p>{% endif %}
-                <p><strong>Status:</strong> {% if os.status == 'Aberta' %}<span class="badge bg-warning">{{ os.status }}</span>{% else %}<span class="badge bg-success">{{ os.status }}</span>{% endif %}</p>
-            </div>
-        </div>
-        <div class="card shadow-sm mb-4">
-            <div class="card-header">Descrição do Problema / Serviço Realizado</div>
-            <div class="card-body">
-                <form action="{{ url_for('detalhe_os', id=os.id) }}" method="POST">
-                    <div class="mb-3"><textarea class="form-control" id="problema" name="problema" rows="5" placeholder="Descreva o problema inicial e o serviço realizado aqui...">{{ os.problema }}</textarea></div>
-                    <div class="mb-3"><label for="valor_servicos" class="form-label">Valor dos Serviços (Mão de Obra)</label><input type="number" step="0.01" class="form-control" id="valor_servicos" name="valor_servicos" value="{{ os.valor_servicos }}"></div>
-                    <button type="submit" class="btn btn-primary w-100">Salvar Descrição e Serviços</button>
-                </form>
-            </div>
-        </div>
+        <div class="card shadow-sm mb-4"><div class="card-header">Informações do Cliente e Serviço</div><div class="card-body"><p><strong>Cliente:</strong> {{ os.cliente.nome_exibicao }}</p><p><strong>Telefone:</strong> {{ os.cliente.telefone_formatado }}</p><hr><p><strong>Data de Abertura:</strong> {{ os.data_criacao.strftime('%d/%m/%Y às %H:%M') }}</p>{% if os.data_fechamento %}<p><strong>Data de Fechamento:</strong> {{ os.data_fechamento.strftime('%d/%m/%Y às %H:%M') }}</p>{% endif %}<p><strong>Status:</strong> {% if os.status == 'Aberta' %}<span class="badge bg-warning">{{ os.status }}</span>{% else %}<span class="badge bg-success">{{ os.status }}</span>{% endif %}</p></div></div>
+        <div class="card shadow-sm mb-4"><div class="card-header">Descrição do Problema / Serviço Realizado</div><div class="card-body"><form action="{{ url_for('detalhe_os', id=os.id) }}" method="POST"><div class="mb-3"><textarea class="form-control" id="problema" name="problema" rows="5" placeholder="Descreva o problema inicial e o serviço realizado aqui...">{{ os.problema }}</textarea></div><div class="mb-3"><label for="valor_servicos" class="form-label">Valor dos Serviços (Mão de Obra)</label><input type="number" step="0.01" class="form-control" id="valor_servicos" name="valor_servicos" value="{{ os.valor_servicos }}"></div><button type="submit" class="btn btn-primary w-100">Salvar Descrição e Serviços</button></form></div></div>
     </div>
 
     <div class="col-md-5">
@@ -42,75 +23,37 @@
                     <div class="mb-2">
                         <label for="produto_id" class="form-label">Produto</label>
                         <select class="form-select" id="produto_id" name="produto_id" required>
-                            <option></option> {% for produto in produtos %}
+                            <option></option>
+                            {% for produto in produtos %}
                                 <option value="{{ produto.id }}" data-valor="{{ produto.valor_venda }}">
-                                    {{ produto.descricao }}
+                                    {{ produto.descricao }} (Estoque: {{ produto.quantidade_estoque }})
                                 </option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="row">
-                        <div class="col">
-                            <label for="quantidade" class="form-label">Quantidade</label>
-                            <input type="number" class="form-control" id="quantidade" name="quantidade" value="1" required>
-                        </div>
-                        <div class="col">
-                            <label for="valor_unitario" class="form-label">Valor Unit.</label>
-                            <div class="input-group">
-                                <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control" id="valor_unitario" name="valor_unitario" readonly>
-                            </div>
-                        </div>
+                        <div class="col"><label for="quantidade" class="form-label">Quantidade</label><input type="number" class="form-control" id="quantidade" name="quantidade" value="1" required></div>
+                        <div class="col"><label for="valor_unitario" class="form-label">Valor Unit.</label><div class="input-group"><span class="input-group-text">R$</span><input type="number" step="0.01" class="form-control" id="valor_unitario" readonly></div></div>
                     </div>
                     <button type="submit" class="btn btn-secondary w-100 mt-3">Adicionar Item</button>
                 </form>
             </div>
         </div>
 
-        <div class="card shadow-sm">
-            <div class="card-header">Peças e Custos Adicionais</div>
-            <div class="card-body">
-                <table class="table table-sm">
-                    <thead><tr><th>Descrição</th><th class="text-center">Qtd</th><th class="text-end">Total</th><th></th></tr></thead>
-                    <tbody>
-                        {% for peca in os.pecas %}
-                        <tr>
-                            <td>{{ peca.descricao }}</td>
-                            <td class="text-center">{{ peca.quantidade }}</td>
-                            <td class="text-end">R$ {{ "%.2f"|format(peca.valor_total) }}</td>
-                            <td class="text-end"><a href="{{ url_for('deletar_peca', peca_id=peca.id) }}" class="btn btn-danger btn-sm py-0 px-1" onclick="return confirm('Remover esta peça?');">X</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <div class="card shadow-sm"><div class="card-header">Peças e Custos Adicionais</div><div class="card-body"><table class="table table-sm"><thead><tr><th>Descrição</th><th class="text-center">Qtd</th><th class="text-end">Total</th><th></th></tr></thead><tbody>{% for peca in os.pecas %}<tr><td>{{ peca.descricao }}</td><td class="text-center">{{ peca.quantidade }}</td><td class="text-end">R$ {{ "%.2f"|format(peca.valor_total) }}</td><td class="text-end"><a href="{{ url_for('deletar_peca', peca_id=peca.id) }}" class="btn btn-danger btn-sm py-0 px-1" onclick="return confirm('Remover esta peça? O estoque será estornado.');">X</a></td></tr>{% endfor %}</tbody></table></div></div>
     </div>
 </div>
 
-<div class="row justify-content-end mt-4">
-    <div class="col-md-5">
-        <div class="card shadow-sm">
-            <div class="card-body text-end">
-                <p class="mb-1">Subtotal Serviços: R$ {{ "%.2f"|format(os.valor_servicos) }}</p>
-                <p class="mb-2">Subtotal Peças: R$ {{ "%.2f"|format(os.valor_pecas) }}</p>
-                <h4 class="mb-0">Valor Total: <span class="badge bg-primary fs-6">R$ {{ "%.2f"|format(os.valor_total) }}</span></h4>
-            </div>
-        </div>
-    </div>
-</div>
+<div class="row justify-content-end mt-4"><div class="col-md-5"><div class="card shadow-sm"><div class="card-body text-end"><p class="mb-1">Subtotal Serviços: R$ {{ "%.2f"|format(os.valor_servicos) }}</p><p class="mb-2">Subtotal Peças: R$ {{ "%.2f"|format(os.valor_pecas) }}</p><h4 class="mb-0">Valor Total: <span class="badge bg-primary fs-6">R$ {{ "%.2f"|format(os.valor_total) }}</span></h4></div></div></div></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 $(document).ready(function() {
-    // Ativa o Select2 para a busca de produtos
     $('#produto_id').select2({
         theme: "bootstrap-5",
         placeholder: "Digite para buscar um produto..."
     });
-
-    // Atualiza o campo de valor quando um produto é selecionado
     $('#produto_id').on('change', function() {
         const selectedOption = $(this).find('option:selected');
         const valorVenda = selectedOption.data('valor') || 0;

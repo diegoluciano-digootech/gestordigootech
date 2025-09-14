@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="h3 mb-3">Relatório de Faturamento por Cliente</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">Filtros</div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('relatorio_faturamento_cliente') }}">
+            <div class="row align-items-end g-3">
+                <div class="col-md-5">
+                    <label for="data_inicio" class="form-label">Data de Início (Emissão)</label>
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ data_inicio or '' }}">
+                </div>
+                <div class="col-md-5">
+                    <label for="data_fim" class="form-label">Data Final (Emissão)</label>
+                    <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ data_fim or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h2 class="h5 mb-0">Ranking de Clientes</h2>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">Posição</th>
+                    <th scope="col">Cliente</th>
+                    <th scope="col" class="text-center">Nº de Faturas</th>
+                    <th scope="col" class="text-end">Valor Total Faturado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente, num_faturas, total_faturado in faturamento_por_cliente %}
+                <tr>
+                    <td>{{ loop.index }}º</td>
+                    <td>{{ cliente.nome_exibicao }}</td>
+                    <td class="text-center">{{ num_faturas }}</td>
+                    <td class="text-end fw-bold">R$ {{ "%.2f"|format(total_faturado) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">Nenhum faturamento encontrado para o período selecionado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

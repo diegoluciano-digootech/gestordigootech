@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="h3 mb-3">Relatório de Fluxo de Caixa</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">Filtros</div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('relatorio_fluxo_caixa') }}">
+            <div class="row align-items-end g-3">
+                <div class="col-md-5">
+                    <label for="data_inicio" class="form-label">Data de Início</label>
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ data_inicio or '' }}">
+                </div>
+                <div class="col-md-5">
+                    <label for="data_fim" class="form-label">Data Final</label>
+                    <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ data_fim or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h2 class="h5 mb-0">Lançamentos Futuros</h2>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">Data Venc.</th>
+                    <th scope="col">Descrição</th>
+                    <th scope="col" class="text-end">Entrada</th>
+                    <th scope="col" class="text-end">Saída</th>
+                    <th scope="col" class="text-end">Saldo Previsto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lancamento in lancamentos %}
+                <tr>
+                    <td>{{ lancamento.data.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ lancamento.descricao }}</td>
+                    <td class="text-end text-success">
+                        {% if lancamento.entrada > 0 %}
+                            R$ {{ "%.2f"|format(lancamento.entrada) }}
+                        {% endif %}
+                    </td>
+                    <td class="text-end text-danger">
+                        {% if lancamento.saida > 0 %}
+                            R$ {{ "%.2f"|format(lancamento.saida) }}
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold {{ 'text-success' if lancamento.saldo >= 0 else 'text-danger' }}">
+                        R$ {{ "%.2f"|format(lancamento.saldo) }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">Nenhum lançamento pendente encontrado para o período selecionado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
