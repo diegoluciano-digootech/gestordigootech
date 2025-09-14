@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0">Orçamentos</h2>
+        <a href="{{ url_for('adicionar_orcamento') }}" class="btn btn-primary">Novo Orçamento</a>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead><tr><th>ID</th><th>Cliente</th><th>Data</th><th>Status</th><th class="text-end">Valor Total</th></tr></thead>
+            <tbody>
+                {% for orcamento in orcamentos %}
+                <tr style="cursor: pointer;" onclick="window.location='{{ url_for('detalhe_orcamento', id=orcamento.id) }}';">
+                    <td>#{{ orcamento.id }}</td>
+                    <td>{{ orcamento.cliente.nome_exibicao }}</td>
+                    <td>{{ orcamento.data_criacao.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ orcamento.status }}</td>
+                    <td class="text-end">R$ {{ "%.2f"|format(orcamento.valor_total) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <label for="cnpj" class="form-label">CNPJ</label>
+        <div class="input-group">
+            <input type="text" class="form-control" id="cnpj" name="cnpj" value="{{ fornecedor.cnpj or '' }}" maxlength="18">
+            <button class="btn btn-outline-secondary" type="button" id="btnConsultarCnpj">Buscar</button>
+        </div>
+    </div>
+    <div class="col-md-8 mb-3">
+        <label for="razao_social" class="form-label">Razão Social</label>
+        <input type="text" class="form-control" id="razao_social" name="razao_social" value="{{ fornecedor.razao_social or '' }}" required>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <label for="nome_fantasia" class="form-label">Nome Fantasia</label>
+        <input type="text" class="form-control" id="nome_fantasia" name="nome_fantasia" value="{{ fornecedor.nome_fantasia or '' }}">
+    </div>
+    <div class="col-md-4 mb-3">
+        <label for="telefone" class="form-label">Telefone</label>
+        <input type="text" class="form-control" id="telefone" name="telefone" value="{{ fornecedor.telefone or '' }}" maxlength="15">
+    </div>
+    <div class="col-md-4 mb-3">
+        <label for="email" class="form-label">E-mail</label>
+        <input type="email" class="form-control" id="email" name="email" value="{{ fornecedor.email or '' }}">
+    </div>
+</div>
+<hr>
+<div class="row">
+    <div class="col-md-3 mb-3">
+        <label for="cep" class="form-label">CEP</label>
+        <input type="text" class="form-control" id="cep" name="cep" value="{{ fornecedor.cep or '' }}" maxlength="9">
+    </div>
+    <div class="col-md-7 mb-3">
+        <label for="rua" class="form-label">Rua</label>
+        <input type="text" class="form-control" id="rua" name="rua" value="{{ fornecedor.rua or '' }}">
+    </div>
+    <div class="col-md-2 mb-3">
+        <label for="numero" class="form-label">N°</label>
+        <input type="text" class="form-control" id="numero" name="numero" value="{{ fornecedor.numero or '' }}">
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-5 mb-3">
+        <label for="bairro" class="form-label">Bairro</label>
+        <input type="text" class="form-control" id="bairro" name="bairro" value="{{ fornecedor.bairro or '' }}">
+    </div>
+    <div class="col-md-5 mb-3">
+        <label for="cidade" class="form-label">Cidade</label>
+        <input type="text" class="form-control" id="cidade" name="cidade" value="{{ fornecedor.cidade or '' }}">
+    </div>
+    <div class="col-md-2 mb-3">
+        <label for="uf" class="form-label">UF</label>
+        <input type="text" class="form-control" id="uf" name="uf" value="{{ fornecedor.uf or '' }}" maxlength="2">
+    </div>
+</div>

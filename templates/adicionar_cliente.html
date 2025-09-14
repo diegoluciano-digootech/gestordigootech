@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-sm">
+            <div class="card-header"><h2 class="h5 mb-0">Adicionar Novo Cliente</h2></div>
+            <div class="card-body">
+                <form action="{{ url_for('adicionar_cliente') }}" method="POST">
+                    {% include '_form_cliente.html' %}
+                    <div class="d-flex justify-content-end mt-3">
+                        <a href="{{ url_for('gerenciar_clientes') }}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Cadastrar Cliente</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/imask"></script>
+ <script>
+ document.addEventListener('DOMContentLoaded', function() {
+     // --- LÓGICA PARA ALTERNAR PF/PJ ---
+     const tipoFisicaRadio = document.getElementById('tipoFisica');
+     const tipoJuridicaRadio = document.getElementById('tipoJuridica');
+     const camposFisica = document.getElementById('camposFisica');
+     const camposJuridica = document.getElementById('camposJuridica');
+     const emailContainerFisica = document.getElementById('emailContainerFisica');
+     const emailPjInput = document.getElementById('email_pj');
+     const emailPfInput = document.getElementById('email_pf');
+     const nomeInput = document.getElementById('nome');
+     const cpfInput = document.getElementById('cpf');
+     const razaoSocialInput = document.getElementById('razao_social');
+     const cnpjInput = document.getElementById('cnpj');
+     
+     function toggleCampos() {
+         if (tipoFisicaRadio.checked) {
+             camposFisica.style.display = 'block';
+             emailContainerFisica.style.display = 'block';
+             camposJuridica.style.display = 'none';
+             nomeInput.required = true;
+             cpfInput.required = true;
+             razaoSocialInput.required = false;
+             cnpjInput.required = false;
+             emailPjInput.name = "_email_disabled"; // Desativa o nome para não enviar
+             emailPfInput.name = "email";
+         } else {
+             camposFisica.style.display = 'none';
+             emailContainerFisica.style.display = 'none';
+             camposJuridica.style.display = 'block';
+             nomeInput.required = false;
+             cpfInput.required = false;
+             razaoSocialInput.required = true;
+             cnpjInput.required = true;
+             emailPjInput.name = "email";
+             emailPfInput.name = "_email_disabled";
+         }
+     }
+     tipoFisicaRadio.addEventListener('change', toggleCampos);
+     tipoJuridicaRadio.addEventListener('change', toggleCampos);
+     toggleCampos();
+
+     // --- LÓGICA PARA CONSULTA DE CNPJ ---
+     document.getElementById('btnConsultarCnpj').addEventListener('click', function() {
+         const cnpjLimpo = cnpjInput.value.replace(/\D/g, '');
+         if (cnpjLimpo.length !== 14) { alert('Digite um CNPJ válido com 14 dígitos.'); return; }
+         this.disabled = true; this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+         fetch(`/consulta-cnpj/${cnpjLimpo}`).then(res => res.json()).then(data => {
+             if (data.erro) { alert('Erro: ' + data.erro); } 
+             else {
+                 document.getElementById('razao_social').value = data.razao_social || '';
+                 document.getElementById('cep').value = data.cep || '';
+                 document.getElementById('rua').value = data.logradouro || '';
+                 document.getElementById('numero').value = data.numero || '';
+                 document.getElementById('bairro').value = data.bairro || '';
+                 document.getElementById('cidade').value = data.municipio || '';
+                 document.getElementById('uf').value = data.uf || '';
+                 emailPjInput.value = data.email || '';
+                 document.getElementById('numero').focus();
+             }
+         }).catch(err => alert('Ocorreu um erro ao buscar os dados do CNPJ.')).finally(() => { this.disabled = false; this.innerHTML = 'Buscar'; });
+     });
+     
+     // --- LÓGICA PARA CONSULTA DE CEP ---
+     document.getElementById('cep').addEventListener('blur', function() {
+         const cepLimpo = this.value.replace(/\D/g, '');
+         if (cepLimpo.length === 8) {
+             fetch(`/consulta-cep/${cepLimpo}`).then(res => res.json()).then(data => {
+                 if (!data.erro) {
+                     document.getElementById('rua').value = data.street || '';
+                     document.getElementById('bairro').value = data.neighborhood || '';
+                     document.getElementById('cidade').value = data.city || '';
+                     document.getElementById('uf').value = data.state || '';
+                     document.getElementById('numero').focus();
+                 }
+             });
+         }
+     });
+
+     // --- MÁSCARAS ---
+     IMask(document.getElementById('cpf'), { mask: '000.000.000-00' });
+     IMask(document.getElementById('cnpj'), { mask: '00.000.000/0000-00' });
+     IMask(document.getElementById('cep'), { mask: '00000-000' });
+     IMask(document.getElementById('telefone'), { mask: [ { mask: '(00) 0000-0000' }, { mask: '(00) 00000-0000' } ] });
+ });
+ </script>
+{% endblock %}

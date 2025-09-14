@@ -37,6 +37,7 @@
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Movimentação</a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('listar_ordens') }}">Ordens de Serviço</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('listar_orcamentos') }}">Orçamentos</a></li>
                         </ul>
                     </li>
                      <li class="nav-item dropdown">
@@ -61,6 +62,7 @@
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('gerenciar_clientes') }}">Clientes</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('gerenciar_fornecedores') }}">Fornecedores</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('gerenciar_status_os') }}">Status da O.S.</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('register') }}">Cadastrar Novo Usuário</a></li>
                         </ul>
                     </li>

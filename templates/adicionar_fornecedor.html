@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-sm">
+            <div class="card-header"><h2 class="h5 mb-0">Adicionar Novo Fornecedor</h2></div>
+            <div class="card-body">
+                <form action="{{ url_for('adicionar_fornecedor') }}" method="POST">
+                    {% include '_form_fornecedor.html' %}
+                    <div class="d-flex justify-content-end mt-3">
+                        <a href="{{ url_for('gerenciar_fornecedores') }}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Cadastrar Fornecedor</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/imask"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cnpjInput = document.getElementById('cnpj');
+    const btnCnpj = document.getElementById('btnConsultarCnpj');
+
+    // --- LÓGICA PARA CONSULTA DE CNPJ ---
+    if(btnCnpj) {
+        btnCnpj.addEventListener('click', function() {
+            const cnpjLimpo = cnpjInput.value.replace(/\D/g, '');
+            if (cnpjLimpo.length !== 14) { alert('Digite um CNPJ válido com 14 dígitos.'); return; }
+            this.disabled = true; this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            fetch(`/consulta-cnpj/${cnpjLimpo}`).then(res => res.json()).then(data => {
+                if (data.erro) { alert('Erro: ' + data.erro); } 
+                else {
+                    document.getElementById('razao_social').value = data.razao_social || '';
+                    document.getElementById('nome_fantasia').value = data.nome_fantasia || '';
+                    document.getElementById('email').value = data.email || '';
+                    document.getElementById('cep').value = data.cep || '';
+                    document.getElementById('rua').value = data.logradouro || '';
+                    document.getElementById('numero').value = data.numero || '';
+                    document.getElementById('bairro').value = data.bairro || '';
+                    document.getElementById('cidade').value = data.municipio || '';
+                    document.getElementById('uf').value = data.uf || '';
+                    IMask(document.getElementById('cep'), { mask: '00000-000' }).value = data.cep || '';
+                    document.getElementById('numero').focus();
+                }
+            }).catch(err => alert('Ocorreu um erro ao buscar os dados do CNPJ.')).finally(() => { this.disabled = false; this.innerHTML = 'Buscar'; });
+        });
+    }
+    
+    // --- LÓGICA PARA CONSULTA DE CEP ---
+    document.getElementById('cep').addEventListener('blur', function() {
+        const cepLimpo = this.value.replace(/\D/g, '');
+        if (cepLimpo.length === 8) {
+            fetch(`/consulta-cep/${cepLimpo}`).then(res => res.json()).then(data => {
+                if (!data.erro) {
+                    document.getElementById('rua').value = data.street || '';
+                    document.getElementById('bairro').value = data.neighborhood || '';
+                    document.getElementById('cidade').value = data.city || '';
+                    document.getElementById('uf').value = data.state || '';
+                    document.getElementById('numero').focus();
+                }
+            });
+        }
+    });
+
+    // --- MÁSCARAS ---
+    IMask(document.getElementById('cnpj'), { mask: '00.000.000/0000-00' });
+    IMask(document.getElementById('cep'), { mask: '00000-000' });
+    IMask(document.getElementById('telefone'), { mask: [ { mask: '(00) 0000-0000' }, { mask: '(00) 00000-0000' } ] });
+});
+</script>
+{% endblock %}

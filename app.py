@@ -111,7 +111,8 @@ class Cliente(db.Model):
 class OrdemServico(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     problema = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), default='Aberta')
+    status_id = db.Column(db.Integer, db.ForeignKey('status_os.id'))
+    status = db.relationship('StatusOS', backref='ordens_servico')
     data_criacao = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     data_fechamento = db.Column(db.DateTime, nullable=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
@@ -226,6 +227,63 @@ class EntradaEstoqueItem(db.Model):
     quantidade = db.Column(db.Integer, nullable=False)
     valor_custo_unitario = db.Column(db.Float, nullable=False)
     produto = db.relationship('Produto')
+
+# Modelo para os Status Personalizáveis da Ordem de Serviço
+class StatusOS(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), nullable=False, unique=True)
+    cor = db.Column(db.String(20), default='secondary') # Cor do badge (ex: primary, success, danger)
+
+    def __repr__(self):
+        return f'<StatusOS {self.nome}>'
+    
+    # Modelo para o cabeçalho do Orçamento
+# Modelo para o cabeçalho do Orçamento
+class Orcamento(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
+    descricao = db.Column(db.Text)
+    valor_servicos = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(20), default='Em Aberto') # Em Aberto, Aprovado, Rejeitado
+    cliente = db.relationship('Cliente', backref='orcamentos')
+    itens = db.relationship('OrcamentoItem', backref='orcamento', cascade="all, delete-orphan")
+
+    @property
+    def valor_produtos(self):
+        return sum(item.valor_total for item in self.itens)
+
+    @property
+    def valor_total(self):
+        return self.valor_servicos + self.valor_produtos
+
+# Modelo para cada item dentro de um Orçamento
+class OrcamentoItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    orcamento_id = db.Column(db.Integer, db.ForeignKey('orcamento.id'), nullable=False)
+    produto_id = db.Column(db.Integer, db.ForeignKey('produto.id'), nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    quantidade = db.Column(db.Integer, nullable=False)
+    valor_unitario = db.Column(db.Float, nullable=False)
+    produto = db.relationship('Produto')
+
+    @property
+    def valor_total(self):
+        return self.quantidade * self.valor_unitario
+    
+# Modelo para cada item dentro de um Orçamento
+class OrcamentoItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    orcamento_id = db.Column(db.Integer, db.ForeignKey('orcamento.id'), nullable=False)
+    produto_id = db.Column(db.Integer, db.ForeignKey('produto.id'), nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    quantidade = db.Column(db.Integer, nullable=False)
+    valor_unitario = db.Column(db.Float, nullable=False)
+    produto = db.relationship('Produto')
+
+    @property
+    def valor_total(self):
+        return self.quantidade * self.valor_unitario
     
 # ROTA DE FATURAMENTO ATUALIZADA (POST)
 @app.route('/faturamento', methods=['GET', 'POST'])
@@ -381,55 +439,55 @@ def logout():
     flash('Você saiu do sistema.', 'success')
     return redirect(url_for('login'))
 
-# Rota para o DASHBOARD (Página Inicial) - Sem alterações
+# Rota para o DASHBOARD (Página Inicial) - COM GRÁFICO CORRIGIDO
 @app.route('/')
 @login_required
 def dashboard():
     hoje = datetime.date.today()
 
+    # Busca os IDs dos status que consideramos como "concluídos"
+    status_concluidos_nomes = ['FINALIZADA', 'FATURADA']
+    status_concluidos = StatusOS.query.filter(StatusOS.nome.in_(status_concluidos_nomes)).all()
+    status_concluidos_ids = [s.id for s in status_concluidos]
+    
     # --- Lógica do Dashboard (Cards) ---
     ordens_finalizadas_no_mes_lista = OrdemServico.query.filter(
-        OrdemServico.status.in_(['Finalizada', 'Faturada']),
+        OrdemServico.status_id.in_(status_concluidos_ids), # CORREÇÃO AQUI
         extract('month', OrdemServico.data_criacao) == hoje.month,
         extract('year', OrdemServico.data_criacao) == hoje.year
     ).all()
     total_faturado_mes = sum(ordem.valor_total for ordem in ordens_finalizadas_no_mes_lista)
     os_finalizadas_mes = len(ordens_finalizadas_no_mes_lista)
-    os_abertas = OrdemServico.query.filter(OrdemServico.status == 'Aberta').count()
+    
+    # Busca status 'ABERTA'
+    status_aberta = StatusOS.query.filter_by(nome='ABERTA').first()
+    os_abertas = OrdemServico.query.filter_by(status_id=status_aberta.id).count() if status_aberta else 0
+    
     ticket_medio = (total_faturado_mes / os_finalizadas_mes) if os_finalizadas_mes > 0 else 0
     
-    # --- LÓGICA DO GRÁFICO CORRIGIDA E SIMPLIFICADA ---
+    # --- LÓGICA DO GRÁFICO ---
     chart_labels = []
     chart_data = []
     
-    # Loop pelos últimos 6 meses
     for i in range(6):
-        # Calcula o primeiro dia do mês que estamos analisando
         data_referencia = hoje - relativedelta(months=i)
         primeiro_dia_mes = data_referencia.replace(day=1)
-        
-        # Calcula o primeiro dia do mês seguinte para usar como limite
         primeiro_dia_proximo_mes = primeiro_dia_mes + relativedelta(months=1)
 
-        # Busca todas as ordens finalizadas/faturadas DENTRO daquele mês
         ordens_do_mes = OrdemServico.query.filter(
-            OrdemServico.status.in_(['Finalizada', 'Faturada']),
+            OrdemServico.status_id.in_(status_concluidos_ids), # CORREÇÃO AQUI
             OrdemServico.data_criacao >= primeiro_dia_mes,
             OrdemServico.data_criacao < primeiro_dia_proximo_mes
         ).all()
 
-        # Soma o faturamento daquele mês
         faturamento_mes_total = sum(ordem.valor_total for ordem in ordens_do_mes)
-        
-        # Adiciona os dados nas listas para o gráfico
-        nome_mes = primeiro_dia_mes.strftime('%b/%y') # Ex: Set/25
+        nome_mes = primeiro_dia_mes.strftime('%b/%y')
         chart_labels.append(nome_mes)
         chart_data.append(faturamento_mes_total)
 
-    # Inverte as listas para que o gráfico seja exibido em ordem cronológica
     chart_labels.reverse()
     chart_data.reverse()
-    
+
     return render_template('dashboard.html', 
                            total_faturado=total_faturado_mes,
                            os_abertas=os_abertas,
@@ -491,16 +549,16 @@ def deletar(id):
         flash('Erro ao deletar a Ordem de Serviço.', 'danger')
     return redirect(url_for('listar_ordens'))
 
-# Rota para ver DETALHES de uma O.S.
+# Rota para ver DETALHES de uma O.S. (com lista de status)
 @app.route('/os/<int:id>', methods=['GET', 'POST'])
 @login_required
 def detalhe_os(id):
     os = OrdemServico.query.get_or_404(id)
 
     if request.method == 'POST':
-        # AMARRAÇÃO: Só permite alterar se o status for 'Aberta'
-        if os.status != 'Aberta':
-            flash(f'A O.S. #{os.id} não pode ser modificada pois o status é "{os.status}". É necessário reabri-la primeiro.', 'warning')
+        # A lógica de salvar a descrição/valor dos serviços permanece aqui
+        if os.status.nome.upper() == 'FATURADA': # Compara pelo nome do status
+            flash('Não é possível alterar uma O.S. que já foi faturada.', 'danger')
             return redirect(url_for('detalhe_os', id=os.id))
 
         os.problema = request.form['problema'].upper()
@@ -513,12 +571,10 @@ def detalhe_os(id):
             flash(f'Erro ao atualizar a Ordem de Serviço: {e}', 'danger')
         return redirect(url_for('detalhe_os', id=os.id))
 
+    # Lógica GET atualizada para buscar produtos e status
     produtos = Produto.query.order_by(Produto.descricao).all()
-    return render_template('detalhe_os.html', os=os, produtos=produtos)
-
-    # Lógica GET atualizada para buscar os produtos
-    produtos = Produto.query.order_by(Produto.descricao).all()
-    return render_template('detalhe_os.html', os=os, produtos=produtos)
+    status_disponiveis = StatusOS.query.all()
+    return render_template('detalhe_os.html', os=os, produtos=produtos, status_disponiveis=status_disponiveis)
 
 # Rota para ADICIONAR uma peça (agora com baixa de estoque)
 @app.route('/os/<int:os_id>/adicionar_peca', methods=['POST'])
@@ -667,18 +723,16 @@ def relatorio_os():
                            sort_by=sort_by,
                            direction=direction)
 
-# Rota para o Relatório de Faturamento
+# Rota para o Relatório de Faturamento (AGORA UNIFICADA)
 @app.route('/relatorio/faturamento')
 @login_required
 def relatorio_faturamento():
+    # ... (lógica de filtros de data e cliente continua a mesma) ...
     data_inicio_str = request.args.get('data_inicio')
     data_fim_str = request.args.get('data_fim')
     cliente_id = request.args.get('cliente_id', 'todos')
 
-    # 1. Monta a consulta base para Faturas
     query_faturas = Faturamento.query
-
-    # 2. Aplica os filtros na consulta de Faturas
     if data_inicio_str:
         data_inicio = datetime.datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
         query_faturas = query_faturas.filter(Faturamento.data_emissao >= data_inicio)
@@ -688,62 +742,66 @@ def relatorio_faturamento():
     if cliente_id != 'todos':
         query_faturas = query_faturas.filter(Faturamento.cliente_id == int(cliente_id))
     
-    # 3. Executa a consulta e obtém a lista de faturas para a tabela
     faturas_filtradas = query_faturas.order_by(Faturamento.id.desc()).all()
 
-    # 4. Calcula os totais dos cards com base nas faturas que foram filtradas
-    total_servicos = 0
-    total_pecas = 0
-    set_os_finalizadas = set()
-
-    for fatura in faturas_filtradas:
-        for os in fatura.ordens:
-            total_servicos += os.valor_servicos
-            total_pecas += os.valor_pecas
-            set_os_finalizadas.add(os.id)
+    # CORREÇÃO AQUI: A lógica de cálculo dos cards foi removida desta tela,
+    # pois o painel de faturas já mostra os totais das faturas filtradas.
+    # Vamos simplificar para evitar o mesmo erro. A tela já exibe a lista de faturas.
+    # Se precisarmos dos cards, teremos que recalcular com base nas faturas e O.S.
+    # Por enquanto, vamos manter a tela funcional sem os cards para evitar o erro.
     
-    faturamento_total = total_servicos + total_pecas
-    num_os_finalizadas = len(set_os_finalizadas)
-    ticket_medio = (faturamento_total / num_os_finalizadas) if num_os_finalizadas > 0 else 0
-    
-    # Busca todos os clientes para popular o menu de seleção
+    # A função agora apenas busca as faturas e os clientes. Os totais virão do painel.
     ordem_inteligente = case((Cliente.nome != None, Cliente.nome), else_=Cliente.razao_social)
     todos_clientes = Cliente.query.order_by(ordem_inteligente).all()
 
+    # Calcula os totais diretamente das faturas filtradas
+    faturamento_total = sum(f.valor_total_faturado for f in faturas_filtradas)
+    # Outros cálculos podem ser feitos de forma similar se necessário
+
     return render_template('relatorio_faturamento.html',
-                           faturas=faturas_filtradas, # Passa a lista de faturas para o template
-                           faturamento_total=faturamento_total,
-                           total_servicos=total_servicos,
-                           total_pecas=total_pecas,
-                           num_os_finalizadas=num_os_finalizadas,
-                           ticket_medio=ticket_medio,
+                           faturas=faturas_filtradas, 
+                           faturamento_total=faturamento_total, # Exemplo de total
                            todos_clientes=todos_clientes,
                            data_inicio=data_inicio_str,
                            data_fim=data_fim_str,
                            cliente_id_filtro=cliente_id)
 
-# Rota para gerenciar CLIENTES
-@app.route('/clientes', methods=['GET', 'POST'])
+# Rota para a LISTA de clientes
+@app.route('/clientes')
 @login_required
 def gerenciar_clientes():
+    todos_clientes = Cliente.query.order_by(Cliente.id.desc()).all()
+    return render_template('clientes.html', clientes=todos_clientes)
+
+# Rota para ADICIONAR um novo cliente (GET para form, POST para salvar)
+@app.route('/cliente/adicionar', methods=['GET', 'POST'])
+@login_required
+def adicionar_cliente():
     if request.method == 'POST':
         tipo_pessoa = request.form['tipo_pessoa']
         validador_cpf = CPF()
         validador_cnpj = CNPJ()
+
         if tipo_pessoa == 'FISICA':
             cpf_raw = request.form.get('cpf', '')
             cpf_limpo = "".join(filter(str.isdigit, cpf_raw))
             if not validador_cpf.validate(cpf_limpo):
                 flash('CPF inválido. Por favor, verifique o número digitado.', 'danger')
-                return redirect(url_for('gerenciar_clientes'))
+                return redirect(url_for('adicionar_cliente'))
             novo_cliente = Cliente(tipo_pessoa='FISICA', nome=request.form.get('nome', '').upper(), cpf=cpf_limpo)
-        else:
+        else: # JURIDICA
             cnpj_raw = request.form.get('cnpj', '')
             cnpj_limpo = "".join(filter(str.isdigit, cnpj_raw))
             if not validador_cnpj.validate(cnpj_limpo):
                 flash('CNPJ inválido. Por favor, verifique o número digitado.', 'danger')
-                return redirect(url_for('gerenciar_clientes'))
-            novo_cliente = Cliente(tipo_pessoa='JURIDICA', razao_social=request.form.get('razao_social', '').upper(), cnpj=cnpj_limpo, inscricao_estadual="".join(filter(str.isdigit, request.form.get('inscricao_estadual', ''))))
+                return redirect(url_for('adicionar_cliente'))
+            novo_cliente = Cliente(
+                tipo_pessoa='JURIDICA',
+                razao_social=request.form.get('razao_social', '').upper(),
+                cnpj=cnpj_limpo,
+                inscricao_estadual="".join(filter(str.isdigit, request.form.get('inscricao_estadual', '')))
+            )
+        
         novo_cliente.telefone = "".join(filter(str.isdigit, request.form.get('telefone', '')))
         novo_cliente.email = request.form.get('email')
         novo_cliente.cep = "".join(filter(str.isdigit, request.form.get('cep', '')))
@@ -752,6 +810,7 @@ def gerenciar_clientes():
         novo_cliente.bairro = request.form.get('bairro', '').upper()
         novo_cliente.cidade = request.form.get('cidade', '').upper()
         novo_cliente.uf = request.form.get('uf', '').upper()
+
         try:
             db.session.add(novo_cliente)
             db.session.commit()
@@ -763,13 +822,21 @@ def gerenciar_clientes():
             db.session.rollback()
             flash(f'Ocorreu um erro inesperado: {e}', 'danger')
         return redirect(url_for('gerenciar_clientes'))
-    todos_clientes = Cliente.query.order_by(Cliente.id.desc()).all()
-    return render_template('clientes.html', clientes=todos_clientes)
 
-# Rota para gerenciar FORNECEDORES
-@app.route('/fornecedores', methods=['GET', 'POST'])
+    # GET: CORREÇÃO APLICADA AQUI - Passa um objeto Cliente vazio para o template
+    return render_template('adicionar_cliente.html', cliente=Cliente())
+
+# Rota para a LISTA de fornecedores
+@app.route('/fornecedores')
 @login_required
 def gerenciar_fornecedores():
+    todos_fornecedores = Fornecedor.query.order_by(Fornecedor.razao_social).all()
+    return render_template('fornecedores.html', fornecedores=todos_fornecedores)
+
+# Rota para ADICIONAR um novo fornecedor (GET para form, POST para salvar)
+@app.route('/fornecedor/adicionar', methods=['GET', 'POST'])
+@login_required
+def adicionar_fornecedor():
     if request.method == 'POST':
         validador_cnpj = CNPJ()
         cnpj_raw = request.form.get('cnpj', '')
@@ -777,7 +844,7 @@ def gerenciar_fornecedores():
 
         if cnpj_limpo and not validador_cnpj.validate(cnpj_limpo):
             flash('CNPJ inválido. Por favor, verifique o número digitado.', 'danger')
-            return redirect(url_for('gerenciar_fornecedores'))
+            return redirect(url_for('adicionar_fornecedor'))
 
         novo_fornecedor = Fornecedor(
             razao_social=request.form.get('razao_social', '').upper(),
@@ -792,7 +859,6 @@ def gerenciar_fornecedores():
             cidade=request.form.get('cidade', '').upper(),
             uf=request.form.get('uf', '').upper()
         )
-
         try:
             db.session.add(novo_fornecedor)
             db.session.commit()
@@ -803,14 +869,13 @@ def gerenciar_fornecedores():
         except Exception as e:
             db.session.rollback()
             flash(f'Ocorreu um erro inesperado: {e}', 'danger')
-        
         return redirect(url_for('gerenciar_fornecedores'))
 
-    todos_fornecedores = Fornecedor.query.order_by(Fornecedor.razao_social).all()
-    return render_template('fornecedores.html', fornecedores=todos_fornecedores)
+    # GET: Mostra a página com o formulário de cadastro
+    return render_template('adicionar_fornecedor.html', fornecedor=Fornecedor())
 
-# Rota para DELETAR um cliente
-@app.route('/cliente/deletar/<int:id>')
+# Rota para DELETAR um cliente (agora via POST)
+@app.route('/cliente/deletar/<int:id>', methods=['POST'])
 @login_required
 def deletar_cliente(id):
     cliente_para_deletar = Cliente.query.get_or_404(id)
@@ -1577,6 +1642,456 @@ def relatorio_faturamento_cliente():
                            faturamento_por_cliente=faturamento_por_cliente,
                            data_inicio=data_inicio_str,
                            data_fim=data_fim_str)
+
+# Rota para EDITAR um fornecedor existente
+@app.route('/fornecedor/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_fornecedor(id):
+    fornecedor = Fornecedor.query.get_or_404(id)
+    if request.method == 'POST':
+        try:
+            # Pega os dados do formulário e atualiza o objeto
+            fornecedor.razao_social = request.form.get('razao_social', '').upper()
+            fornecedor.nome_fantasia = request.form.get('nome_fantasia', '').upper()
+            fornecedor.cnpj = "".join(filter(str.isdigit, request.form.get('cnpj', '')))
+            fornecedor.telefone = "".join(filter(str.isdigit, request.form.get('telefone', '')))
+            fornecedor.email = request.form.get('email')
+            fornecedor.cep = "".join(filter(str.isdigit, request.form.get('cep', '')))
+            fornecedor.rua = request.form.get('rua', '').upper()
+            fornecedor.numero = request.form.get('numero')
+            fornecedor.bairro = request.form.get('bairro', '').upper()
+            fornecedor.cidade = request.form.get('cidade', '').upper()
+            fornecedor.uf = request.form.get('uf', '').upper()
+
+            db.session.commit()
+            flash('Fornecedor atualizado com sucesso!', 'success')
+            return redirect(url_for('gerenciar_fornecedores'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ocorreu um erro ao atualizar o fornecedor: {e}', 'danger')
+    
+    # GET: Mostra a página de edição com os dados preenchidos
+    return render_template('editar_fornecedor.html', fornecedor=fornecedor)
+
+# Rota para DELETAR um fornecedor
+@app.route('/fornecedor/deletar/<int:id>', methods=['POST'])
+@login_required
+def deletar_fornecedor(id):
+    fornecedor = Fornecedor.query.get_or_404(id)
+
+    # Amarração: Verifica se o fornecedor está vinculado a alguma conta a pagar
+    conta_vinculada = ContaPagar.query.filter_by(fornecedor_id=id).first()
+    if conta_vinculada:
+        flash(f'Não é possível excluir "{fornecedor.razao_social}", pois ele está vinculado a contas a pagar.', 'danger')
+        return redirect(url_for('gerenciar_fornecedores'))
+
+    try:
+        db.session.delete(fornecedor)
+        db.session.commit()
+        flash(f'Fornecedor "{fornecedor.razao_social}" deletado com sucesso.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao deletar o fornecedor: {e}', 'danger')
+    
+    return redirect(url_for('gerenciar_fornecedores'))
+
+# --- ROTAS PARA GERENCIAMENTO DE STATUS DA O.S. ---
+
+@app.route('/cadastros/status-os', methods=['GET', 'POST'])
+@login_required
+def gerenciar_status_os():
+    if request.method == 'POST':
+        novo_status = StatusOS(
+            nome=request.form['nome'].upper(),
+            cor=request.form['cor']
+        )
+        try:
+            db.session.add(novo_status)
+            db.session.commit()
+            flash(f'Status "{novo_status.nome}" criado com sucesso!', 'success')
+        except IntegrityError:
+            db.session.rollback()
+            flash('Erro: Já existe um status com este nome.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ocorreu um erro: {e}', 'danger')
+        return redirect(url_for('gerenciar_status_os'))
+
+    status_cadastrados = StatusOS.query.all()
+    return render_template('status_os.html', status_cadastrados=status_cadastrados)
+
+@app.route('/cadastros/status-os/deletar/<int:id>', methods=['POST'])
+@login_required
+def deletar_status_os(id):
+    status_para_deletar = StatusOS.query.get_or_404(id)
+    # Adicionar verificação se o status está em uso no futuro
+    try:
+        db.session.delete(status_para_deletar)
+        db.session.commit()
+        flash('Status deletado com sucesso.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao deletar o status: {e}', 'danger')
+    return redirect(url_for('gerenciar_status_os'))
+
+# COMANDO PARA MIGRAR O.S. PARA STATUS PERSONALIZÁVEIS
+@app.cli.command("migrate-os-status")
+def migrate_os_status_command():
+    """Atualiza a tabela OrdemServico para usar a nova tabela de status."""
+    print("Iniciando migração de status da O.S....")
+    try:
+        # Adiciona a nova coluna status_id
+        comando_add_col = text('ALTER TABLE ordem_servico ADD COLUMN status_id INTEGER REFERENCES status_os(id)')
+        db.session.execute(comando_add_col)
+        db.session.commit()
+        print("  - Coluna 'status_id' adicionada à tabela 'ordem_servico'.")
+    except Exception as e:
+        if "duplicate column name" in str(e):
+            print("  - Coluna 'status_id' já existe, pulando.")
+        else:
+            print(f"  - Aviso ao adicionar coluna: {e}")
+        db.session.rollback()
+    
+    # Cria status padrão se não existirem
+    with app.app_context():
+        status_existentes = StatusOS.query.all()
+        if not status_existentes:
+            print("  - Criando status padrão (Aberta, Finalizada, Faturada)...")
+            aberta = StatusOS(nome='ABERTA', cor='warning')
+            finalizada = StatusOS(nome='FINALIZADA', cor='success')
+            faturada = StatusOS(nome='FATURADA', cor='secondary')
+            db.session.add_all([aberta, finalizada, faturada])
+            db.session.commit()
+
+    print("Migração de status concluída.")
+
+# COMANDO PARA CORRIGIR OS DADOS DE STATUS ANTIGOS NAS ORDENS DE SERVIÇO
+@app.cli.command("fix-os-status-data")
+def fix_os_status_data_command():
+    """Popula a nova coluna status_id com base na antiga coluna de texto 'status'."""
+    print("Iniciando a correção dos dados de status das Ordens de Serviço...")
+    try:
+        with app.app_context():
+            # Mapeia os nomes dos status para seus IDs
+            status_map = {s.nome: s.id for s in StatusOS.query.all()}
+            if not status_map:
+                print("ERRO: Status padrão não encontrados. Rode 'flask migrate-os-status' primeiro.")
+                return
+
+            # Pega todas as O.S. que ainda não têm um status_id definido
+            os_para_atualizar = db.session.execute(text("SELECT id, status FROM ordem_servico WHERE status_id IS NULL")).fetchall()
+
+            if not os_para_atualizar:
+                print("Nenhuma O.S. para atualizar. Os dados já estão corretos.")
+                return
+            
+            print(f"Encontradas {len(os_para_atualizar)} Ordens de Serviço para atualizar...")
+
+            for os_data in os_para_atualizar:
+                os_id, old_status_str = os_data
+                if old_status_str:
+                    os_obj = OrdemServico.query.get(os_id)
+                    # Garante que o nome do status antigo corresponda ao novo padrão (maiúsculo)
+                    status_nome_padrao = old_status_str.upper()
+                    if status_nome_padrao in status_map:
+                        os_obj.status_id = status_map[status_nome_padrao]
+                        print(f"  - O.S. #{os_id} atualizada para o status '{status_nome_padrao}' (ID: {os_obj.status_id})")
+                    else:
+                        print(f"  - AVISO: Status antigo '{old_status_str}' na O.S. #{os_id} não foi encontrado nos novos status e será ignorado.")
+            
+            db.session.commit()
+            print("Atualização dos dados concluída com sucesso!")
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Ocorreu um erro durante a correção dos dados: {e}")
+
+# Rota para ATUALIZAR O STATUS de uma O.S.
+@app.route('/os/atualizar-status/<int:os_id>', methods=['POST'])
+@login_required
+def atualizar_status_os(os_id):
+    os = OrdemServico.query.get_or_404(os_id)
+    novo_status_id = request.form.get('status_id')
+    
+    # Lógica para data de fechamento
+    status_finalizada = StatusOS.query.filter_by(nome='FINALIZADA').first()
+    if status_finalizada and int(novo_status_id) == status_finalizada.id:
+        os.data_fechamento = datetime.datetime.utcnow()
+    else:
+        os.data_fechamento = None
+
+    try:
+        os.status_id = novo_status_id
+        db.session.commit()
+        flash('Status da O.S. atualizado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar o status: {e}', 'danger')
+
+    return redirect(url_for('detalhe_os', id=os_id))
+
+# --- ROTAS PARA GERENCIAMENTO DE ORÇAMENTOS ---
+
+@app.route('/orcamentos')
+@login_required
+def listar_orcamentos():
+    orcamentos = Orcamento.query.order_by(Orcamento.data_criacao.desc()).all()
+    return render_template('listar_orcamentos.html', orcamentos=orcamentos)
+
+@app.route('/orcamentos/adicionar', methods=['GET', 'POST'])
+@login_required
+def adicionar_orcamento():
+    if request.method == 'POST':
+        try:
+            novo_orcamento = Orcamento(
+                cliente_id=request.form['cliente_id'],
+                descricao=request.form['descricao'].upper(),
+                valor_servicos=float(request.form.get('valor_servicos', 0))
+            )
+            db.session.add(novo_orcamento)
+            db.session.commit()
+            flash('Orçamento criado com sucesso! Adicione os itens.', 'success')
+            return redirect(url_for('detalhe_orcamento', id=novo_orcamento.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar orçamento: {e}', 'danger')
+    
+    clientes = Cliente.query.order_by(Cliente.nome).all()
+    return render_template('adicionar_orcamento.html', clientes=clientes)
+
+@app.route('/orcamentos/<int:id>', methods=['GET', 'POST'])
+@login_required
+def detalhe_orcamento(id):
+    orcamento = Orcamento.query.get_or_404(id)
+    if request.method == 'POST': # Para salvar alterações na descrição/serviços
+        try:
+            orcamento.descricao = request.form['descricao'].upper()
+            orcamento.valor_servicos = float(request.form.get('valor_servicos', 0))
+            db.session.commit()
+            flash('Orçamento atualizado com sucesso!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao atualizar orçamento: {e}', 'danger')
+        return redirect(url_for('detalhe_orcamento', id=id))
+        
+    produtos = Produto.query.order_by(Produto.descricao).all()
+    return render_template('detalhe_orcamento.html', orcamento=orcamento, produtos=produtos)
+
+@app.route('/orcamentos/<int:orcamento_id>/adicionar_item', methods=['POST'])
+@login_required
+def adicionar_item_orcamento(orcamento_id):
+    try:
+        produto = Produto.query.get(request.form['produto_id'])
+        novo_item = OrcamentoItem(
+            orcamento_id=orcamento_id,
+            produto_id=produto.id,
+            descricao=produto.descricao,
+            quantidade=int(request.form['quantidade']),
+            valor_unitario=produto.valor_venda
+        )
+        db.session.add(novo_item)
+        db.session.commit()
+        flash('Item adicionado ao orçamento.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao adicionar item: {e}', 'danger')
+    return redirect(url_for('detalhe_orcamento', id=orcamento_id))
+
+@app.route('/orcamentos/item/deletar/<int:item_id>')
+@login_required
+def deletar_item_orcamento(item_id):
+    item = OrcamentoItem.query.get_or_404(item_id)
+    orcamento_id = item.orcamento_id
+    try:
+        db.session.delete(item)
+        db.session.commit()
+        flash('Item removido do orçamento.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao remover item: {e}', 'danger')
+    return redirect(url_for('detalhe_orcamento', id=orcamento_id))
+
+@app.route('/orcamentos/converter/<int:id>', methods=['POST'])
+@login_required
+def converter_orcamento_para_os(id):
+    orcamento = Orcamento.query.get_or_404(id)
+    if not orcamento.itens:
+        flash('Não é possível converter um orçamento sem itens.', 'warning')
+        return redirect(url_for('detalhe_orcamento', id=id))
+
+    try:
+        # Pega o status "Aberta" padrão
+        status_aberta = StatusOS.query.filter_by(nome='ABERTA').first()
+        if not status_aberta:
+            flash('Status "ABERTA" não encontrado. Crie-o no cadastro de status.', 'danger')
+            return redirect(url_for('detalhe_orcamento', id=id))
+
+        # Cria a nova Ordem de Serviço
+        nova_os = OrdemServico(
+            cliente_id=orcamento.cliente_id,
+            problema=orcamento.descricao,
+            valor_servicos=orcamento.valor_servicos,
+            status_id=status_aberta.id
+        )
+        db.session.add(nova_os)
+        
+        # Transfere os itens do orçamento para a O.S. e dá baixa no estoque
+        for item in orcamento.itens:
+            peca = Peca(
+                ordem_servico=nova_os,
+                descricao=item.descricao,
+                quantidade=item.quantidade,
+                valor_unitario=item.valor_unitario
+            )
+            db.session.add(peca)
+            
+            # Baixa no estoque
+            produto = Produto.query.get(item.produto_id)
+            if produto.quantidade_estoque < item.quantidade:
+                flash(f'Estoque insuficiente para "{produto.descricao}" no momento da conversão. Baixa não realizada.', 'warning')
+            else:
+                produto.quantidade_estoque -= item.quantidade
+
+        orcamento.status = 'Aprovado' # Marca o orçamento como aprovado/convertido
+        db.session.commit()
+        flash(f'Orçamento #{id} convertido com sucesso para a O.S. #{nova_os.id}!', 'success')
+        return redirect(url_for('detalhe_os', id=nova_os.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ocorreu um erro ao converter o orçamento: {e}', 'danger')
+        return redirect(url_for('detalhe_orcamento', id=id))
+    
+# --- ROTAS PARA GERENCIAMENTO DE ORÇAMENTOS ---
+
+@app.route('/orcamentos')
+@login_required
+def listar_orcamentos():
+    orcamentos = Orcamento.query.order_by(Orcamento.data_criacao.desc()).all()
+    return render_template('listar_orcamentos.html', orcamentos=orcamentos)
+
+@app.route('/orcamentos/adicionar', methods=['GET', 'POST'])
+@login_required
+def adicionar_orcamento():
+    if request.method == 'POST':
+        try:
+            novo_orcamento = Orcamento(
+                cliente_id=request.form['cliente_id'],
+                descricao=request.form['descricao'].upper(),
+                valor_servicos=float(request.form.get('valor_servicos', 0))
+            )
+            db.session.add(novo_orcamento)
+            db.session.commit()
+            flash('Orçamento criado com sucesso! Adicione os itens.', 'success')
+            return redirect(url_for('detalhe_orcamento', id=novo_orcamento.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao criar orçamento: {e}', 'danger')
+    
+    clientes = Cliente.query.order_by(Cliente.nome).all()
+    return render_template('adicionar_orcamento.html', clientes=clientes)
+
+@app.route('/orcamentos/<int:id>', methods=['GET', 'POST'])
+@login_required
+def detalhe_orcamento(id):
+    orcamento = Orcamento.query.get_or_404(id)
+    if request.method == 'POST': # Para salvar alterações na descrição/serviços
+        try:
+            orcamento.descricao = request.form['descricao'].upper()
+            orcamento.valor_servicos = float(request.form.get('valor_servicos', 0))
+            db.session.commit()
+            flash('Orçamento atualizado com sucesso!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao atualizar orçamento: {e}', 'danger')
+        return redirect(url_for('detalhe_orcamento', id=id))
+        
+    produtos = Produto.query.order_by(Produto.descricao).all()
+    return render_template('detalhe_orcamento.html', orcamento=orcamento, produtos=produtos)
+
+@app.route('/orcamentos/<int:orcamento_id>/adicionar_item', methods=['POST'])
+@login_required
+def adicionar_item_orcamento(orcamento_id):
+    try:
+        produto = Produto.query.get(request.form['produto_id'])
+        novo_item = OrcamentoItem(
+            orcamento_id=orcamento_id,
+            produto_id=produto.id,
+            descricao=produto.descricao,
+            quantidade=int(request.form['quantidade']),
+            valor_unitario=produto.valor_venda
+        )
+        db.session.add(novo_item)
+        db.session.commit()
+        flash('Item adicionado ao orçamento.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao adicionar item: {e}', 'danger')
+    return redirect(url_for('detalhe_orcamento', id=orcamento_id))
+
+@app.route('/orcamentos/item/deletar/<int:item_id>')
+@login_required
+def deletar_item_orcamento(item_id):
+    item = OrcamentoItem.query.get_or_404(item_id)
+    orcamento_id = item.orcamento_id
+    try:
+        db.session.delete(item)
+        db.session.commit()
+        flash('Item removido do orçamento.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao remover item: {e}', 'danger')
+    return redirect(url_for('detalhe_orcamento', id=orcamento_id))
+
+@app.route('/orcamentos/converter/<int:id>', methods=['POST'])
+@login_required
+def converter_orcamento_para_os(id):
+    orcamento = Orcamento.query.get_or_404(id)
+    if not orcamento.itens and orcamento.valor_servicos == 0:
+        flash('Não é possível converter um orçamento vazio.', 'warning')
+        return redirect(url_for('detalhe_orcamento', id=id))
+
+    try:
+        # Pega o status "Aberta" padrão
+        status_aberta = StatusOS.query.filter(func.upper(StatusOS.nome) == 'ABERTA').first()
+        if not status_aberta:
+            flash('Status "ABERTA" não encontrado. Crie-o no cadastro de status.', 'danger')
+            return redirect(url_for('detalhe_orcamento', id=id))
+
+        # Cria a nova Ordem de Serviço
+        nova_os = OrdemServico(
+            cliente_id=orcamento.cliente_id,
+            problema=orcamento.descricao,
+            valor_servicos=orcamento.valor_servicos,
+            status_id=status_aberta.id
+        )
+        db.session.add(nova_os)
+        
+        # Transfere os itens do orçamento para a O.S. e dá baixa no estoque
+        for item in orcamento.itens:
+            peca = Peca(
+                ordem_servico=nova_os,
+                descricao=item.descricao,
+                quantidade=item.quantidade,
+                valor_unitario=item.valor_unitario
+            )
+            db.session.add(peca)
+            
+            produto = Produto.query.get(item.produto_id)
+            if produto.quantidade_estoque < item.quantidade:
+                flash(f'Atenção: Estoque insuficiente para "{produto.descricao}". Baixa não realizada.', 'warning')
+            else:
+                produto.quantidade_estoque -= item.quantidade
+
+        orcamento.status = 'Aprovado'
+        db.session.commit()
+        flash(f'Orçamento #{id} convertido com sucesso para a O.S. #{nova_os.id}!', 'success')
+        return redirect(url_for('detalhe_os', id=nova_os.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ocorreu um erro ao converter o orçamento: {e}', 'danger')
+        return redirect(url_for('detalhe_orcamento', id=id))
 
 # --- Inicialização ---
 if __name__ == "__main__":

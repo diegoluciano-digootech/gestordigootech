@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header"><h2 class="h5 mb-0">Adicionar Novo Status de O.S.</h2></div>
+            <div class="card-body">
+                <form action="{{ url_for('gerenciar_status_os') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome do Status</label>
+                        <input type="text" class="form-control" id="nome" name="nome" placeholder="Ex: AGUARDANDO PEÇA" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cor" class="form-label">Cor do Badge</label>
+                        <select name="cor" id="cor" class="form-select">
+                            <option value="primary">Azul</option>
+                            <option value="secondary">Cinza</option>
+                            <option value="success">Verde</option>
+                            <option value="danger">Vermelho</option>
+                            <option value="warning">Amarelo</option>
+                            <option value="info">Azul Claro</option>
+                            <option value="dark">Preto</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Adicionar Status</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header"><h2 class="h5 mb-0">Status Cadastrados</h2></div>
+            <div class="card-body">
+                <table class="table">
+                    <thead><tr><th>Nome</th><th>Preview</th><th class="text-end">Ações</th></tr></thead>
+                    <tbody>
+                        {% for status in status_cadastrados %}
+                        <tr>
+                            <td>{{ status.nome }}</td>
+                            <td><span class="badge bg-{{ status.cor }}">{{ status.nome }}</span></td>
+                            <td class="text-end">
+                                <form action="{{ url_for('deletar_status_os', id=status.id) }}" method="POST" onsubmit="return confirm('Deseja realmente excluir este status?');">
+                                    <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,112 +1,10 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="card shadow-sm mb-4">
-    <div class="card-header">
-        <h2 class="h5 mb-0">Adicionar Novo Cliente</h2>
-    </div>
-    <div class="card-body">
-        <form action="{{ url_for('gerenciar_clientes') }}" method="POST">
-            <div class="mb-3">
-                <label class="form-label">Tipo de Pessoa</label>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="tipo_pessoa" id="tipoFisica" value="FISICA" checked>
-                    <label class="form-check-label" for="tipoFisica">Pessoa Física</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="tipo_pessoa" id="tipoJuridica" value="JURIDICA">
-                    <label class="form-check-label" for="tipoJuridica">Pessoa Jurídica</label>
-                </div>
-            </div>
-
-            <fieldset id="camposFisica">
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label for="cpf" class="form-label">CPF</label>
-                        <input type="text" class="form-control" id="cpf" name="cpf" maxlength="14">
-                    </div>
-                    <div class="col-md-8 mb-3">
-                        <label for="nome" class="form-label">Nome Completo</label>
-                        <input type="text" class="form-control" id="nome" name="nome">
-                    </div>
-                </div>
-            </fieldset>
-
-            <fieldset id="camposJuridica" style="display: none;">
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label for="cnpj" class="form-label">CNPJ</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="cnpj" name="cnpj" maxlength="18">
-                            <button class="btn btn-outline-secondary" type="button" id="btnConsultarCnpj">Buscar Dados</button>
-                        </div>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="inscricao_estadual" class="form-label">Inscrição Estadual (I.E.)</label>
-                        <input type="text" class="form-control" id="inscricao_estadual" name="inscricao_estadual">
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="email" class="form-label">E-mail</label>
-                        <input type="email" class="form-control" id="email" name="email">
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label for="razao_social" class="form-label">Razão Social</label>
-                    <input type="text" class="form-control" id="razao_social" name="razao_social">
-                </div>
-            </fieldset>
-
-            <hr>
-            
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <label for="telefone" class="form-label">Telefone</label>
-                    <input type="text" class="form-control" id="telefone" name="telefone" maxlength="15">
-                </div>
-                <div class="col-md-8 mb-3" id="emailContainerFisica">
-                    <label for="emailFisica" class="form-label">E-mail</label>
-                    <input type="email" class="form-control" id="emailFisica" name="email">
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-3 mb-3">
-                    <label for="cep" class="form-label">CEP</label>
-                    <input type="text" class="form-control" id="cep" name="cep" maxlength="9">
-                </div>
-                <div class="col-md-7 mb-3">
-                    <label for="rua" class="form-label">Rua</label>
-                    <input type="text" class="form-control" id="rua" name="rua">
-                </div>
-                <div class="col-md-2 mb-3">
-                    <label for="numero" class="form-label">N°</label>
-                    <input type="text" class="form-control" id="numero" name="numero">
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-5 mb-3">
-                    <label for="bairro" class="form-label">Bairro</label>
-                    <input type="text" class="form-control" id="bairro" name="bairro">
-                </div>
-                <div class="col-md-5 mb-3">
-                    <label for="cidade" class="form-label">Cidade</label>
-                    <input type="text" class="form-control" id="cidade" name="cidade">
-                </div>
-                <div class="col-md-2 mb-3">
-                    <label for="uf" class="form-label">UF</label>
-                    <input type="text" class="form-control" id="uf" name="uf" maxlength="2">
-                </div>
-            </div>
-            
-            <button type="submit" class="btn btn-primary">Cadastrar Cliente</button>
-        </form>
-    </div>
-</div>
-
 <div class="card shadow-sm">
-    <div class="card-header">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="h5 mb-0">Clientes Cadastrados</h2>
+        <a href="{{ url_for('adicionar_cliente') }}" class="btn btn-primary">Novo Cliente</a>
     </div>
     <div class="card-body">
         <table class="table table-hover">
@@ -115,7 +13,7 @@
                     <th scope="col">Nome / Razão Social</th>
                     <th scope="col">Documento</th>
                     <th scope="col">Telefone</th>
-                    <th scope="col">Ações</th>
+                    <th scope="col" class="text-end">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -125,8 +23,12 @@
                     <td>{{ cliente.documento_exibicao }}</td>
                     <td>{{ cliente.telefone_formatado }}</td>
                     <td class="text-end">
-                        <a href="{{ url_for('editar_cliente', id=cliente.id) }}" class="btn btn-secondary btn-sm">Editar</a>
-                        <a href="{{ url_for('deletar_cliente', id=cliente.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Atenção: Esta ação é permanente. Deseja continuar?');">Deletar</a>
+                        <div class="btn-group">
+                            <a href="{{ url_for('editar_cliente', id=cliente.id) }}" class="btn btn-secondary btn-sm">Editar</a>
+                            <form action="{{ url_for('deletar_cliente', id=cliente.id) }}" method="POST" class="ms-1" onsubmit="return confirm('ATENÇÃO: A exclusão é permanente. Deseja continuar?');">
+                                <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -134,101 +36,4 @@
         </table>
     </div>
 </div>
-
-<script>
-    // Seleciona os elementos do formulário
-    const tipoFisicaRadio = document.getElementById('tipoFisica');
-    const tipoJuridicaRadio = document.getElementById('tipoJuridica');
-    const camposFisica = document.getElementById('camposFisica');
-    const camposJuridica = document.getElementById('camposJuridica');
-    const emailContainerFisica = document.getElementById('emailContainerFisica');
-
-    // Inputs que são obrigatórios
-    const nomeInput = document.getElementById('nome');
-    const cpfInput = document.getElementById('cpf');
-    const razaoSocialInput = document.getElementById('razao_social');
-    const cnpjInput = document.getElementById('cnpj');
-
-    function toggleCampos() {
-        if (tipoFisicaRadio.checked) {
-            camposFisica.style.display = 'block';
-            emailContainerFisica.style.display = 'block';
-            camposJuridica.style.display = 'none';
-            nomeInput.required = true;
-            cpfInput.required = true;
-            razaoSocialInput.required = false;
-            cnpjInput.required = false;
-        } else {
-            camposFisica.style.display = 'none';
-            emailContainerFisica.style.display = 'none'; // Esconde o e-mail duplicado de PF
-            camposJuridica.style.display = 'block';
-            nomeInput.required = false;
-            cpfInput.required = false;
-            razaoSocialInput.required = true;
-            cnpjInput.required = true;
-        }
-    }
-
-    tipoFisicaRadio.addEventListener('change', toggleCampos);
-    tipoJuridicaRadio.addEventListener('change', toggleCampos);
-    toggleCampos(); // Estado inicial
-
-    // --- NOVA LÓGICA PARA CONSULTA DE CNPJ ---
-document.getElementById('btnConsultarCnpj').addEventListener('click', function() {
-    const cnpjInput = document.getElementById('cnpj');
-    const btn = this; // O próprio botão
-
-    // Limpa o CNPJ, deixando apenas números
-    const cnpjLimpo = cnpjInput.value.replace(/\D/g, '');
-
-    if (cnpjLimpo.length !== 14) {
-        alert('Por favor, digite um CNPJ válido com 14 dígitos.');
-        return;
-    }
-
-    // Mostra um feedback visual para o usuário
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Buscando...';
-
-    // Chama a nossa API interna no Flask
-    fetch(`/consulta-cnpj/${cnpjLimpo}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.erro) {
-                alert('Erro: ' + data.erro);
-            } else {
-                // Preenche os campos do formulário com os dados recebidos
-                document.getElementById('razao_social').value = data.razao_social || '';
-                document.getElementById('cep').value = data.cep || '';
-                document.getElementById('rua').value = data.logradouro || '';
-                document.getElementById('numero').value = data.numero || '';
-                document.getElementById('bairro').value = data.bairro || '';
-                document.getElementById('cidade').value = data.municipio || '';
-                document.getElementById('uf').value = data.uf || '';
-                // Aplica as máscaras novamente após preencher
-                IMask(document.getElementById('cep'), { mask: '00000-000' }).value = data.cep || '';
-            }
-        })
-        .catch(error => {
-            console.error('Erro na requisição:', error);
-            alert('Ocorreu um erro ao tentar buscar os dados do CNPJ.');
-        })
-        .finally(() => {
-            // Restaura o botão ao estado original
-            btn.disabled = false;
-            btn.innerHTML = 'Buscar Dados';
-        });
-});
-
-    // Aplica as máscaras de formatação com IMask.js
-    IMask(document.getElementById('cpf'), { mask: '000.000.000-00' });
-    IMask(document.getElementById('cnpj'), { mask: '00.000.000/0000-00' });
-    IMask(document.getElementById('cep'), { mask: '00000-000' });
-    IMask(document.getElementById('telefone'), {
-        mask: [
-            { mask: '(00) 0000-0000' },
-            { mask: '(00) 00000-0000' }
-        ]
-    });
-</script>
 {% endblock %}
