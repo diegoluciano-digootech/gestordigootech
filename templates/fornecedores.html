@@ -4,6 +4,10 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="h5 mb-0">Fornecedores Cadastrados</h2>
+        <form action="{{ url_for('gerenciar_fornecedores') }}" method="GET" class="d-flex" style="width: 300px;">
+            <input class="form-control me-2" type="search" placeholder="Buscar Fornecedor..." name="q" value="{{ search_term or '' }}">
+            <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+        </form>
         <a href="{{ url_for('adicionar_fornecedor') }}" class="btn btn-primary">Novo Fornecedor</a>
     </div>
     <div class="card-body">
