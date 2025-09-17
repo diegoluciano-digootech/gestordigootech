@@ -8,15 +8,40 @@
     </div>
     <div class="card-body">
         <table class="table table-hover">
-            <thead><tr><th>ID</th><th>Cliente</th><th>Data</th><th>Status</th><th class="text-end">Valor Total</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Data</th>
+                    <th>Status</th>
+                    <th class="text-end">Valor Total</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
             <tbody>
                 {% for orcamento in orcamentos %}
-                <tr style="cursor: pointer;" onclick="window.location='{{ url_for('detalhe_orcamento', id=orcamento.id) }}';">
+                <tr>
                     <td>#{{ orcamento.id }}</td>
                     <td>{{ orcamento.cliente.nome_exibicao }}</td>
                     <td>{{ orcamento.data_criacao.strftime('%d/%m/%Y') }}</td>
-                    <td>{{ orcamento.status }}</td>
+                    <td>
+                        {% if orcamento.status == 'Aprovado' %}
+                            <span class="badge bg-success">{{ orcamento.status }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ orcamento.status }}</span>
+                        {% endif %}
+                    </td>
                     <td class="text-end">R$ {{ "%.2f"|format(orcamento.valor_total) }}</td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            <a href="{{ url_for('detalhe_orcamento', id=orcamento.id) }}" class="btn btn-secondary btn-sm">Editar / Ver</a>
+                            {% if orcamento.status == 'Em Aberto' %}
+                            <form action="{{ url_for('deletar_orcamento', id=orcamento.id) }}" method="POST" class="ms-1" onsubmit="return confirm('ATENÇÃO: A exclusão é permanente. Deseja continuar?');">
+                                <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

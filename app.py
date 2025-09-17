@@ -18,6 +18,7 @@ import pandas as pd
 from validate_docbr import CPF, CNPJ
 import requests
 from dateutil.relativedelta import relativedelta
+from enum import Enum
 
 # --- Configuração do App Flask ---
 app = Flask(__name__)
@@ -119,6 +120,8 @@ class StatusOS(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(50), nullable=False, unique=True)
     cor = db.Column(db.String(20), default='secondary')
+    ABERTA = "Aberta"
+    FINALIZADA = "Finalizada"
 
 class OrdemServico(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -221,7 +224,6 @@ class OrcamentoItem(db.Model):
     produto = db.relationship('Produto')
     @property
     def valor_total(self): return self.quantidade * self.valor_unitario
-
 
 # ==============================================================================
 # 3. ROTAS PRINCIPAIS E DE AUTENTICAÇÃO
@@ -326,7 +328,9 @@ def dashboard():
 def gerenciar_clientes():
     search_term = request.args.get('q', '')
     query = Cliente.query
+
     if search_term:
+        # Busca por nome, razão social, cpf ou cnpj
         search_filter = or_(
             Cliente.nome.ilike(f'%{search_term}%'),
             Cliente.razao_social.ilike(f'%{search_term}%'),
@@ -334,6 +338,7 @@ def gerenciar_clientes():
             Cliente.cnpj.ilike(f'%{search_term}%')
         )
         query = query.filter(search_filter)
+
     todos_clientes = query.order_by(Cliente.id.desc()).all()
     return render_template('clientes.html', clientes=todos_clientes, search_term=search_term)
 
@@ -713,10 +718,8 @@ def adicionar_os():
 @login_required
 def detalhe_os(id):
     os = OrdemServico.query.get_or_404(id)
+
     if request.method == 'POST':
-        if os.status and os.status.nome.upper() == 'FATURADA':
-            flash('A O.S. não pode ser modificada pois está faturada.', 'warning')
-            return redirect(url_for('detalhe_os', id=os.id))
         os.problema = request.form['problema'].upper()
         os.valor_servicos = float(request.form.get('valor_servicos', 0) or 0)
         try:
@@ -726,9 +729,10 @@ def detalhe_os(id):
             db.session.rollback()
             flash(f'Erro ao atualizar a Ordem de Serviço: {e}', 'danger')
         return redirect(url_for('detalhe_os', id=os.id))
+
+    # Lógica GET atualizada para buscar os produtos
     produtos = Produto.query.order_by(Produto.descricao).all()
-    status_disponiveis = StatusOS.query.all()
-    return render_template('detalhe_os.html', os=os, produtos=produtos, status_disponiveis=status_disponiveis)
+    return render_template('detalhe_os.html', os=os, produtos=produtos)
 
 @app.route('/os/atualizar-status/<int:os_id>', methods=['POST'])
 @login_required
@@ -913,6 +917,44 @@ def converter_orcamento_para_os(id):
         flash(f'Ocorreu um erro ao converter o orçamento: {e}', 'danger')
         return redirect(url_for('detalhe_orcamento', id=id))
 
+
+@app.route('/orcamentos/deletar/<int:id>', methods=['POST'])
+@login_required
+def deletar_orcamento(id):
+    orcamento = Orcamento.query.get_or_404(id)
+    
+    # Amarração: Não permite excluir orçamentos que já foram aprovados/convertidos
+    if orcamento.status != 'Em Aberto':
+        flash(f'Não é possível excluir o orçamento #{id}, pois ele já foi "{orcamento.status}".', 'danger')
+        return redirect(url_for('listar_orcamentos'))
+
+    try:
+        db.session.delete(orcamento)
+        db.session.commit()
+        flash(f'Orçamento #{id} deletado com sucesso.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao deletar o orçamento: {e}', 'danger')
+    
+    return redirect(url_for('listar_orcamentos'))
+
+@app.route('/orcamentos/pdf/<int:id>')
+@login_required
+def gerar_orcamento_pdf(id):
+    orcamento = Orcamento.query.get_or_404(id)
+    logo_data_uri = None
+    try:
+        project_path = pathlib.Path(__file__).parent
+        logo_path = project_path / 'static' / 'images' / 'logo.png'
+        with open(logo_path, 'rb') as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        logo_data_uri = f"data:image/png;base64,{encoded_string}"
+    except FileNotFoundError:
+        logging.warning("Arquivo logo.png não encontrado para o PDF do orçamento.")
+
+    html_renderizado = render_template('orcamento_pdf_template.html', orcamento=orcamento, logo_path=logo_data_uri)
+    pdf = HTML(string=html_renderizado, base_url=str(project_path)).write_pdf()
+    return Response(pdf, mimetype='application/pdf', headers={'Content-Disposition': f'inline; filename=orcamento_{orcamento.id}.pdf'})
 
 # ==============================================================================
 # 6. ROTAS FINANCEIRAS (FATURAMENTO, CONTAS A PAGAR/RECEBER)
@@ -1409,6 +1451,87 @@ def migrate_financeiro_command():
         db.create_all()
     print("Tabelas financeiras verificadas/criadas.")
     print("Migração financeira concluída.")
+
+# ======================================================================
+# 10. ROTAS API (JSON) PARA MOBILE
+# ======================================================================
+
+@app.route('/api/login', methods=['POST'])
+def api_login_route():
+    data = request.get_json()
+    if not data:
+        return jsonify({
+    "status": "ok",
+    "mensagem": "Login efetuado com sucesso!",
+    "user_id": user.id,
+    "username": user.username
+    }), 200
+
+
+    username = data.get('username')
+    password = data.get('password')
+    user = User.query.filter_by(username=username).first()
+
+    if user and user.check_password(password):
+        return jsonify({
+            "status": "ok",
+            "message": "Login efetuado com sucesso!",
+            "user_id": user.id,
+            "username": user.username
+        }), 200
+    else:
+        return jsonify({"status": "error", "message": "Credenciais inválidas"}), 401
+
+@app.route('/api/clientes', methods=['GET'])
+def api_listar_clientes():
+    clientes = Cliente.query.all()
+    clientes_json = [
+        {
+            "id": c.id,
+            "nome": c.nome_exibicao,
+            "documento": c.documento_exibicao,
+            "telefone": c.telefone_formatado,
+            "email": c.email
+        } for c in clientes
+    ]
+    return jsonify(clientes_json), 200
+
+@app.route('/api/ordens', methods=['GET'])
+def api_listar_ordens():
+    ordens = OrdemServico.query.order_by(OrdemServico.data_criacao.desc()).all()
+    ordens_json = [
+        {
+            "id": os.id,
+            "cliente": os.cliente.nome_exibicao,
+            "problema": os.problema,
+            "status": os.status.nome if os.status else "N/A",
+            "valor_total": os.valor_total,
+            "data_criacao": os.data_criacao.strftime("%Y-%m-%d %H:%M:%S")
+        } for os in ordens
+    ]
+    return jsonify(ordens_json), 200
+
+@app.route('/api/ordens/<int:id>', methods=['GET'])
+def api_detalhe_ordem(id):
+    os = OrdemServico.query.get_or_404(id)
+    os_json = {
+        "id": os.id,
+        "cliente": os.cliente.nome_exibicao,
+        "problema": os.problema,
+        "status": os.status.nome if os.status else "N/A",
+        "valor_servicos": os.valor_servicos,
+        "valor_pecas": os.valor_pecas,
+        "valor_total": os.valor_total,
+        "pecas": [
+            {
+                "descricao": p.descricao,
+                "quantidade": p.quantidade,
+                "valor_unitario": p.valor_unitario,
+                "valor_total": p.valor_total
+            } for p in os.pecas
+        ]
+    }
+    return jsonify(os_json), 200
 
 if __name__ == "__main__":
     with app.app_context():
