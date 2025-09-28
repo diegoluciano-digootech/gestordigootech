@@ -120,8 +120,6 @@ class StatusOS(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(50), nullable=False, unique=True)
     cor = db.Column(db.String(20), default='secondary')
-    ABERTA = "Aberta"
-    FINALIZADA = "Finalizada"
 
 class OrdemServico(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -323,23 +321,70 @@ def dashboard():
 # ==============================================================================
 
 # --- CLIENTES ---
-@app.route('/clientes')
+@app.route('/clientes', methods=['GET', 'POST'])
 @login_required
 def gerenciar_clientes():
+    if request.method == 'POST':
+        tipo_pessoa = request.form['tipo_pessoa']
+        validador_cpf = CPF()
+        validador_cnpj = CNPJ()
+
+        if tipo_pessoa == 'FISICA':
+            cpf_raw = request.form.get('cpf', '')
+            cpf_limpo = "".join(filter(str.isdigit, cpf_raw))
+            if not validador_cpf.validate(cpf_limpo):
+                flash('CPF inválido. Por favor, verifique o número digitado.', 'danger')
+                return redirect(url_for('gerenciar_clientes'))
+            novo_cliente = Cliente(tipo_pessoa='FISICA', nome=request.form.get('nome', '').upper(), cpf=cpf_limpo)
+        else:
+            cnpj_raw = request.form.get('cnpj', '')
+            cnpj_limpo = "".join(filter(str.isdigit, cnpj_raw))
+            if not validador_cnpj.validate(cnpj_limpo):
+                flash('CNPJ inválido. Por favor, verifique o número digitado.', 'danger')
+                return redirect(url_for('gerenciar_clientes'))
+            novo_cliente = Cliente(tipo_pessoa='JURIDICA', razao_social=request.form.get('razao_social', '').upper(), cnpj=cnpj_limpo, inscricao_estadual="".join(filter(str.isdigit, request.form.get('inscricao_estadual', ''))))
+
+        novo_cliente.telefone = "".join(filter(str.isdigit, request.form.get('telefone', '')))
+        novo_cliente.email = request.form.get('email')
+        novo_cliente.cep = "".join(filter(str.isdigit, request.form.get('cep', '')))
+        novo_cliente.rua = request.form.get('rua', '').upper()
+        novo_cliente.numero = request.form.get('numero')
+        novo_cliente.bairro = request.form.get('bairro', '').upper()
+        novo_cliente.cidade = request.form.get('cidade', '').upper()
+        novo_cliente.uf = request.form.get('uf', '').upper()
+
+        try:
+            db.session.add(novo_cliente)
+            db.session.commit()
+            flash(f'Cliente "{novo_cliente.nome_exibicao}" cadastrado com sucesso!', 'success')
+        except IntegrityError:
+            db.session.rollback()
+            flash('Erro: Já existe um cliente com este Nome/Razão Social ou Documento.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ocorreu um erro inesperado: {e}', 'danger')
+
+        return redirect(url_for('gerenciar_clientes'))
+
+    # Lógica GET (para exibir a página)
     search_term = request.args.get('q', '')
     query = Cliente.query
 
     if search_term:
-        # Busca por nome, razão social, cpf ou cnpj
+        doc_search_term = "".join(filter(str.isdigit, search_term))
         search_filter = or_(
             Cliente.nome.ilike(f'%{search_term}%'),
             Cliente.razao_social.ilike(f'%{search_term}%'),
-            Cliente.cpf.ilike(f'%{search_term}%'),
-            Cliente.cnpj.ilike(f'%{search_term}%')
+            Cliente.cpf.ilike(f'%{doc_search_term}%'),
+            Cliente.cnpj.ilike(f'%{doc_search_term}%'),
+            Cliente.cidade.ilike(f'%{search_term}%')
         )
         query = query.filter(search_filter)
-
-    todos_clientes = query.order_by(Cliente.id.desc()).all()
+    
+    # Ordena pelo nome/razão social para um resultado mais intuitivo
+    ordem_inteligente = case((Cliente.nome != None, Cliente.nome), else_=Cliente.razao_social)
+    todos_clientes = query.order_by(ordem_inteligente.asc()).all()
+    
     return render_template('clientes.html', clientes=todos_clientes, search_term=search_term)
 
 @app.route('/cliente/adicionar', methods=['GET', 'POST'])
@@ -440,6 +485,55 @@ def deletar_cliente(id):
     except Exception as e:
         flash(f'Erro ao deletar o cliente: {e}', 'danger')
     return redirect(url_for('gerenciar_clientes'))
+
+@app.route('/relatorio/clientes/pdf')
+@login_required
+def relatorio_clientes_pdf():
+    clientes = Cliente.query.order_by(Cliente.id.asc()).all()
+    data_geracao = datetime.datetime.now()
+    logo_data_uri = None
+    try:
+        project_path = pathlib.Path(__file__).parent
+        logo_path = project_path / 'static' / 'images' / 'logo.png'
+        with open(logo_path, 'rb') as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        logo_data_uri = f"data:image/png;base64,{encoded_string}"
+    except FileNotFoundError:
+        logging.warning("Arquivo logo.png não encontrado para o PDF do relatório de clientes.")
+
+    # Certifique-se de que você tem o template 'relatorio_clientes_pdf.html' na pasta templates
+    html_renderizado = render_template('relatorio_clientes_pdf.html',
+                                       clientes=clientes,
+                                       data_geracao=data_geracao,
+                                       logo_path=logo_data_uri)
+    pdf = HTML(string=html_renderizado).write_pdf()
+    return Response(pdf, mimetype='application/pdf', headers={'Content-Disposition': 'inline; filename=relatorio_clientes.pdf'})
+
+@app.route('/relatorio/clientes/excel')
+@login_required
+def relatorio_clientes_excel():
+    clientes = Cliente.query.order_by(Cliente.id.asc()).all()
+    dados_para_excel = []
+    for c in clientes:
+        dados_para_excel.append({
+            'ID': c.id,
+            'Nome/Razão Social': c.nome_exibicao,
+            'Documento': c.documento_exibicao,
+            'Telefone': c.telefone_formatado,
+            'Email': c.email,
+            'Cidade/UF': f"{c.cidade or ''}/{c.uf or ''}"
+        })
+
+    df = pd.DataFrame(dados_para_excel)
+    output = io.BytesIO()
+    # No seu app.py, a biblioteca para Excel é 'openpyxl', então vamos mantê-la
+    writer = pd.ExcelWriter(output, engine='openpyxl')
+    df.to_excel(writer, index=False, sheet_name='RelatorioClientes')
+    # O método close() é o correto para a versão mais recente do pandas/openpyxl
+    writer.close()
+    output.seek(0)
+
+    return Response(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={'Content-Disposition': 'attachment; filename=relatorio_clientes.xlsx'})
 
 # --- FORNECEDORES ---
 @app.route('/fornecedores')

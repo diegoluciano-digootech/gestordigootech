@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Clientes</title>
+    <style>
+        @page { size: A4; margin: 1.5cm; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #333; font-size: 9pt; }
+        .header { text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #005f73; position: relative; }
+        .header img { max-height: 70px; width: auto; }
+        h1 { font-size: 16pt; color: #005f73; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: none; border-bottom: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .footer { text-align: center; margin-top: 30px; font-size: 8pt; color: #777; border-top: 1px solid #eee; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if logo_path %}
+            <img src="{{ logo_path }}">
+        {% endif %}
+        <h1>Relatório de Clientes</h1>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nome / Razão Social</th>
+                <th>Documento</th>
+                <th>Telefone</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in clientes %}
+            <tr>
+                <td>{{ cliente.id }}</td>
+                <td>{{ cliente.nome_exibicao }}</td>
+                <td>{{ cliente.documento_exibicao }}</td>
+                <td>{{ cliente.telefone_formatado }}</td>
+                <td>{{ cliente.email }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center;">Nenhum cliente encontrado.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Relatório gerado em {{ data_geracao.strftime('%d/%m/%Y às %H:%M') }}</p>
+    </div>
+</body>
+</html>
