@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastrar Novo Cliente{% endblock %}
+
+{% block content %}
+<div class="card my-4">
+    <div class="card-header">
+        <h2 class="mb-0">Cadastrar Novo Cliente</h2>
+    </div>
+    <div class="card-body">
+        <form method="POST" novalidate>
+            <h5>Identificação</h5>
+            <hr class="mt-0">
+            <div class="row">
+                <div class="col-md-5 mb-3">
+                    <label for="nome" class="form-label">Nome / Razão Social</label>
+                    <input type="text" class="form-control" id="nome" name="nome" required value="{{ form_data.get('nome', '') }}">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label for="documento" class="form-label">CNPJ / CPF</label>
+                    <input type="text" class="form-control" id="documento" name="documento" value="{{ form_data.get('documento', '') }}">
+                </div>
+                <div class="col-md-3 mb-3" id="campo-ie" style="display: none;">
+                    <label for="inscricao_estadual" class="form-label">Inscrição Estadual</label>
+                    <input type="text" class="form-control" id="inscricao_estadual" name="inscricao_estadual" value="{{ form_data.get('inscricao_estadual', '') }}">
+                </div>
+            </div>
+
+            <h5 class="mt-3">Endereço</h5>
+            <hr class="mt-0">
+            <div class="row">
+                <div class="col-md-8 mb-3"><label for="endereco" class="form-label">Endereço (Rua, Av.)</label><input type="text" class="form-control" id="endereco" name="endereco" value="{{ form_data.get('endereco', '') }}"></div>
+                <div class="col-md-4 mb-3"><label for="numero" class="form-label">Número</label><input type="text" class="form-control" id="numero" name="numero" value="{{ form_data.get('numero', '') }}"></div>
+            </div>
+            <div class="row">
+                <div class="col-md-5 mb-3"><label for="cidade" class="form-label">Cidade</label><input type="text" class="form-control" id="cidade" name="cidade" value="{{ form_data.get('cidade', '') }}"></div>
+                <div class="col-md-2 mb-3"><label for="uf" class="form-label">UF</label><input type="text" class="form-control" id="uf" name="uf" maxlength="2" value="{{ form_data.get('uf', '') }}"></div>
+                <div class="col-md-5 mb-3"><label for="cep" class="form-label">CEP</label><input type="text" class="form-control" id="cep" name="cep" value="{{ form_data.get('cep', '') }}"></div>
+            </div>
+
+            <h5 class="mt-3">Contatos</h5>
+            <hr class="mt-0">
+            <div id="contatos-container">
+                <div class="row g-3 align-items-center mb-2 contato-linha">
+                    <div class="col"><input type="text" class="form-control" name="contato_nome" placeholder="Nome do Contato" required></div>
+                    <div class="col"><input type="email" class="form-control" name="contato_email" placeholder="Email" required></div>
+                    <div class="col"><input type="text" class="form-control campo-telefone" name="contato_telefone" placeholder="Telefone" required></div>
+                    <div class="col-auto"><button type="button" class="btn btn-danger btn-sm remover-contato" style="display: none;">-</button></div>
+                </div>
+            </div>
+            <button type="button" id="adicionar-contato" class="btn btn-success btn-sm mt-2">+ Adicionar Contato</button>
+            <hr>
+            <div class="text-end">
+                <a href="{{ url_for('clientes.listar') }}" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">Salvar Cliente</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/imask"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- PARTE 1: LÓGICA DO CNPJ/CPF ---
+        const documentoInput = document.getElementById('documento');
+        const campoIe = document.getElementById('campo-ie'); // Pega o novo campo de IE
+        
+        const mascaraDocOpcoes = {
+            mask: [
+                { mask: '000.000.000-00', maxLength: 11 },
+                { mask: '00.000.000/0000-00' }
+            ]
+        };
+        const maskDoc = IMask(documentoInput, mascaraDocOpcoes);
+
+        // --- NOVA LÓGICA PARA MOSTRAR/ESCONDER O CAMPO IE ---
+        function verificarTipoDocumento() {
+            const valorSemMascara = maskDoc.unmaskedValue;
+            if (valorSemMascara.length > 11) {
+                campoIe.style.display = 'block';
+            } else {
+                campoIe.style.display = 'none';
+                document.getElementById('inscricao_estadual').value = '';
+            }
+        }
+        documentoInput.addEventListener('keyup', verificarTipoDocumento);
+        verificarTipoDocumento(); // Roda uma vez ao carregar a página
+        // --------------------------------------------------------
+
+        documentoInput.addEventListener('blur', function() {
+            const cnpjLimpo = maskDoc.unmaskedValue;
+            if (cnpjLimpo.length === 14) {
+                documentoInput.disabled = true;
+                fetch(`/clientes/consultar-cnpj/${cnpjLimpo}`)
+                    .then(response => {
+                        if (!response.ok) { throw new Error('CNPJ não encontrado'); }
+                        return response.json();
+                    })
+                    .then(dados => {
+                        document.getElementById('nome').value = dados.nome || '';
+                        document.getElementById('endereco').value = dados.endereco || '';
+                        document.getElementById('numero').value = dados.numero || '';
+                        document.getElementById('cidade').value = dados.cidade || '';
+                        document.getElementById('uf').value = dados.uf || '';
+                        document.getElementById('cep').value = dados.cep || '';
+                        document.querySelector('[name="contato_telefone"]').value = dados.telefone || '';
+                    })
+                    .catch(error => {
+                        alert('Erro ao consultar o CNPJ. Verifique o número e tente novamente.');
+                        console.error('Erro:', error);
+                    })
+                    .finally(() => {
+                        documentoInput.disabled = false;
+                    });
+            }
+        });
+
+        // --- PARTE 2: LÓGICA DA MÁSCARA DE TELEFONE ---
+        // (código sem alterações)
+        const mascaraTelefoneOpcoes = { mask: [ { mask: '(00) 0000-0000', maxLength: 10 }, { mask: '(00) 00000-0000' } ] };
+        function aplicarMascaraTelefone(elemento) { IMask(elemento, mascaraTelefoneOpcoes); }
+        aplicarMascaraTelefone(document.querySelector('.campo-telefone'));
+
+        // --- PARTE 3: LÓGICA DOS CONTATOS DINÂMICOS ---
+        // (código sem alterações)
+        const btnAdicionarContato = document.getElementById('adicionar-contato');
+        const contatosContainer = document.getElementById('contatos-container');
+        const moldeContato = contatosContainer.querySelector('.contato-linha').cloneNode(true);
+        moldeContato.querySelectorAll('input').forEach(input => input.required = false);
+        moldeContato.querySelector('.remover-contato').style.display = 'inline-block';
+        btnAdicionarContato.addEventListener('click', function() {
+            const novaLinha = moldeContato.cloneNode(true);
+            novaLinha.querySelectorAll('input').forEach(input => input.value = '');
+            contatosContainer.appendChild(novaLinha);
+            const novoCampoTelefone = novaLinha.querySelector('.campo-telefone');
+            if (novoCampoTelefone) { aplicarMascaraTelefone(novoCampoTelefone); }
+        });
+        contatosContainer.addEventListener('click', function(event) {
+            if (event.target.classList.contains('remover-contato')) {
+                event.target.closest('.contato-linha').remove();
+            }
+        });
+    });
+</script>
+{% endblock %}

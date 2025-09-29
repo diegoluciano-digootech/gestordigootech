@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerenciar Clientes{% endblock %}
+
+{% block content %}
+<div class="card my-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="mb-0">Gerenciar Clientes</h2>
+        <div class="d-flex">
+            <form class="d-flex me-2" role="search">
+                <input class="form-control form-control-sm" type="search" placeholder="Buscar Cliente..." aria-label="Buscar">
+                <button class="btn btn-sm btn-outline-secondary" type="submit">Buscar</button>
+            </form>
+            <a href="{{ url_for('clientes.criar') }}" class="btn btn-sm btn-primary">Novo Cliente</a>
+            <div class="dropdown ms-2">
+                <button class="btn btn-sm btn-dark dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Exportar
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#">Exportar para Excel</a></li>
+                    <li><a class="dropdown-item" href="#">Exportar para PDF</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">Nome / Razão Social</th>
+                    <th scope="col">Documento</th>
+                    <th scope="col">Telefone</th>
+                    <th scope="col" class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr>
+                    <td>{{ cliente.nome }}</td>
+                    <td>{{ cliente.documento }}</td>
+                    <td>{{ cliente.telefone }}</td>
+                    <td class="text-end">
+                        <a href="#" class="btn btn-sm btn-secondary">Editar</a>
+                        <a href="#" class="btn btn-sm btn-danger">Deletar</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">Nenhum cliente cadastrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
