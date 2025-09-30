@@ -36,4 +36,7 @@ def criar_app():
     app.register_blueprint(clientes_bp)
     # --------------------------
 
+    from app.blueprints.fornecedores.rotas import fornecedores
+    app.register_blueprint(fornecedores)
+
     return app

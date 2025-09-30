@@ -7,11 +7,11 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="mb-0">Gerenciar Clientes</h2>
         <div class="d-flex">
-            <form class="d-flex me-2" role="search">
-                <input class="form-control form-control-sm" type="search" placeholder="Buscar Cliente..." aria-label="Buscar">
-                <button class="btn btn-sm btn-outline-secondary" type="submit">Buscar</button>
-            </form>
-            <a href="{{ url_for('clientes.criar') }}" class="btn btn-sm btn-primary">Novo Cliente</a>
+            <div class="input-group me-2">
+                <input class="form-control form-control-sm" type="search" placeholder="Buscar Cliente..." aria-label="Buscar" id="live-search-input">
+                </div>
+            
+            <a href="{{ url_for('clientes.criar') }}" class="btn btn-sm btn-primary">Cadastrar</a>
             <div class="dropdown ms-2">
                 <button class="btn btn-sm btn-dark dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     Exportar
@@ -33,24 +33,89 @@
                     <th scope="col" class="text-end">Ações</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for cliente in clientes %}
+            <tbody id="clientes-table-body">
                 <tr>
-                    <td>{{ cliente.nome }}</td>
-                    <td>{{ cliente.documento }}</td>
-                    <td>{{ cliente.telefone }}</td>
-                    <td class="text-end">
-                        <a href="#" class="btn btn-sm btn-secondary">Editar</a>
-                        <a href="#" class="btn btn-sm btn-danger">Deletar</a>
-                    </td>
+                    <td colspan="4" class="text-center">Carregando clientes...</td>
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4" class="text-center">Nenhum cliente cadastrado.</td>
-                </tr>
-                {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('live-search-input');
+        const tableBody = document.getElementById('clientes-table-body');
+        let searchTimer; // Para evitar buscas excessivas (debounce)
+
+        // Função que renderiza as linhas da tabela com os dados recebidos
+        function renderTable(clientes) {
+            tableBody.innerHTML = ''; // Limpa o conteúdo atual
+            
+            if (clientes.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhum cliente encontrado.</td></tr>';
+                return;
+            }
+
+            clientes.forEach(cliente => {
+                // Monta a URL de edição/deleção com o ID do cliente
+                const editUrl = `{{ url_for('clientes.editar', cliente_id=0) }}`.replace('0', cliente.id);
+                const deleteUrl = `{{ url_for('clientes.deletar', cliente_id=0) }}`.replace('0', cliente.id);
+                
+                const row = `
+                    <tr>
+                        <td>${cliente.nome}</td>
+                        <td>${cliente.documento}</td>
+                        <td>${cliente.telefone || '-'}</td>
+                        <td class="text-end">
+                            <a href="${editUrl}" class="btn btn-sm btn-secondary">Editar</a>
+                            <a href="${deleteUrl}" class="btn btn-sm btn-danger">Deletar</a>
+                        </td>
+                    </tr>
+                `;
+                tableBody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+
+        // Função principal que chama a rota de API do servidor
+        function fetchClientes(termo) {
+           const urlBase = `{{ url_for('clientes.api_buscar_clientes') }}`;
+           const url = `${urlBase}?termo=${encodeURIComponent(termo)}`;
+            
+            // Feedback visual: Indica que está buscando
+            tableBody.innerHTML = '<tr><td colspan="4" class="text-center"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Buscando...</td></tr>';
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                         // Lança erro caso a resposta do servidor não seja 200 (OK)
+                        throw new Error(`Erro HTTP: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(clientes => {
+                    renderTable(clientes);
+                })
+                .catch(error => {
+                    console.error('Erro na busca:', error);
+                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar clientes. Verifique o console.</td></tr>';
+                });
+        }
+        
+        // Listener de Input: Chama a busca após um pequeno atraso (300ms)
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimer); // Cancela o timer anterior
+            const termo = this.value.trim();
+
+            searchTimer = setTimeout(() => {
+                fetchClientes(termo);
+            }, 300); // 300ms de atraso
+        });
+
+        // Carrega os dados iniciais ao carregar a página
+        fetchClientes('');
+    });
+</script>
 {% endblock %}

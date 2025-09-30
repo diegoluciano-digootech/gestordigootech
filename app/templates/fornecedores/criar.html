@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Cadastrar Novo Cliente{% endblock %}
+{% block title %}Cadastrar Novo Fornecedor{% endblock %}
 
 {% block content %}
 <div class="card my-4">
     <div class="card-header">
-        <h2 class="mb-0">Cadastrar Novo Cliente</h2>
+        <h2 class="mb-0">Cadastrar Novo Fornecedor</h2>
     </div>
     <div class="card-body">
-        <form method="POST" novalidate id="form-cadastro-cliente">
+        <form method="POST" novalidate id="form-cadastro-fornecedor"> 
             <h5>Identificação</h5>
             <hr class="mt-0">
             <div class="row">
@@ -51,10 +51,10 @@
             <button type="button" id="adicionar-contato" class="btn btn-success btn-sm mt-2">+ Adicionar Contato</button>
             <hr>
             <div class="text-end">
-                <a href="{{ url_for('clientes.listar') }}" class="btn btn-secondary">Cancelar</a>
+                <a href="{{ url_for('fornecedores.listar') }}" class="btn btn-secondary">Cancelar</a>
                 <button type="submit" id="btn-salvar" class="btn btn-primary">
                     <span id="spinner-salvar" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                    <span id="btn-salvar-texto">Salvar Cliente</span>
+                    <span id="btn-salvar-texto">Salvar Fornecedor</span>
                 </button>
             </div>
         </form>
@@ -67,7 +67,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // --- ELEMENTOS GLOBAIS PARA CONTROLE DE ESTADO ---
-        const form = document.getElementById('form-cadastro-cliente');
+        const form = document.getElementById('form-cadastro-fornecedor');
         const documentoInput = document.getElementById('documento');
         const btnSalvar = document.getElementById('btn-salvar');
         const spinnerSalvar = document.getElementById('spinner-salvar');
@@ -107,7 +107,8 @@
                     btnSalvarTexto.textContent = ' Consultando...';
                 }
                 
-                fetch(`/clientes/consultar-cnpj/${cnpjLimpo}`)
+                // 4. URL CONSULTA: Mudar o prefixo da rota de 'clientes' para 'fornecedores'
+                fetch(`/fornecedores/consultar-cnpj/${cnpjLimpo}`)
                     .then(response => {
                         if (!response.ok) { throw new Error('CNPJ não encontrado'); }
                         return response.json();
@@ -132,7 +133,8 @@
                         if (btnSalvar) {
                             btnSalvar.disabled = false; // Habilita o Salvar após a consulta
                             spinnerSalvar.classList.add('d-none');
-                            btnSalvarTexto.textContent = 'Salvar Cliente';
+                            // 5. TEXTO: Mudar Cliente para Fornecedor no botão após a consulta
+                            btnSalvarTexto.textContent = 'Salvar Fornecedor'; 
                         }
                     });
             }
@@ -148,7 +150,8 @@
                 
                 btnSalvar.disabled = true;
                 spinnerSalvar.classList.remove('d-none'); // Mostra o spinner
-                btnSalvarTexto.textContent = ' Salvando...';
+                // 6. TEXTO: Mudar Cliente para Fornecedor no botão durante a submissão
+                btnSalvarTexto.textContent = ' Salvando Fornecedor...'; 
             });
         }
 
